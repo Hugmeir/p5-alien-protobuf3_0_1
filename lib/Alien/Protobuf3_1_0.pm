@@ -7,6 +7,8 @@ use base qw( Alien::Base );
 
 our $VERSION = '1.00';
 
+sub cxxflags {''} # not provided
+
 1;
 __END__
 =pod
