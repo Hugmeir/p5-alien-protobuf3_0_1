@@ -1,0 +1,25 @@
+use alienfile;
+
+plugin 'PkgConfig' => (
+    pkg_name    => 'libprotobuf',
+    max_version => '3.1.1',
+);
+
+share {
+    plugin Download => (
+        url     => 'https://github.com/protocolbuffers/protobuf/releases/download/v3.1.0/protobuf-cpp-3.1.0.tar.gz',
+        version => qr/protobuf-cpp-([0-9\.]+)\.tar\.gz$/,
+    );
+
+    plugin Extract => 'tar.gz';
+
+      plugin 'Build::Autoconf' => ();
+
+      build [
+        '%{configure}',
+        '%{make}',
+        '%{make} install',
+      ];
+
+};
+
