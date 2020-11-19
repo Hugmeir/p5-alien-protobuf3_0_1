@@ -1,7 +1,7 @@
 use alienfile;
 
 plugin 'PkgConfig' => (
-    pkg_name    => 'libprotobuf',
+    pkg_name    => 'protobuf',
     max_version => '3.1.1',
 );
 
