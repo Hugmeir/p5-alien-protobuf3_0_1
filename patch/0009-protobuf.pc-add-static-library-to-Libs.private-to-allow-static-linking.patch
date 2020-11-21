@@ -1,10 +1,44 @@
---- ./protobuf.pc.in	2020-11-21 14:56:06.000000000 +0100
-+++ ./protobuf.pc.in	2020-11-21 14:57:02.000000000 +0100
-@@ -7,6 +7,6 @@
+From e346b5146ac11786cbfab930b2c538be04997353 Mon Sep 17 00:00:00 2001
+From: Brian Fraser <brian.fraser@booking.com>
+Date: Sat, 21 Nov 2020 20:05:27 +0100
+Subject: [PATCH] protobuf.pc.in: include the static library in Libs.private to
+ allow static linking
+
+---
+ configure      | 1 +
+ protobuf.pc.in | 3 ++-
+ 2 files changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/configure b/configure
+index 2274412..cdd18d4 100755
+--- a/configure
++++ b/configure
+@@ -775,6 +775,7 @@ sysconfdir
+ datadir
+ datarootdir
+ libexecdir
++libext
+ sbindir
+ bindir
+ program_transform_name
+diff --git a/protobuf.pc.in b/protobuf.pc.in
+index 4901490..e75ddb9 100644
+--- a/protobuf.pc.in
++++ b/protobuf.pc.in
+@@ -2,11 +2,12 @@ prefix=@prefix@
+ exec_prefix=@exec_prefix@
+ libdir=@libdir@
+ includedir=@includedir@
++libext=.@libext@
+ 
+ Name: Protocol Buffers
  Description: Google's Data Interchange Format
  Version: @VERSION@
  Libs: -L${libdir} -lprotobuf @PTHREAD_CFLAGS@ @PTHREAD_LIBS@
 -Libs.private: @LIBS@
-+Libs.private: @LIBS@ -L${libdir}/libprotobuf@CMAKE_STATIC_LIBRARY_SUFFIX@
++Libs.private: @LIBS@ -L${libdir}/libprotobuf${libext}
  Cflags: -I${includedir} @PTHREAD_CFLAGS@
  Conflicts: protobuf-lite
+-- 
+2.29.2
+

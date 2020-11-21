@@ -1,0 +1,3 @@
+See https://github.com/Hugmeir/protobuf/commits/v3.1.0-cpp-tarball
+for the commits here; there's an extra patch here removing the gmake/
+directory.
