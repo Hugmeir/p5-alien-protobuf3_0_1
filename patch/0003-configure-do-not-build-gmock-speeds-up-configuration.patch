@@ -1,0 +1,36 @@
+From 855d48d82454ef6a7334a0faa14e7c97e8555f7e Mon Sep 17 00:00:00 2001
+From: Brian Fraser <brian.fraser@booking.com>
+Date: Sat, 21 Nov 2020 18:02:51 +0100
+Subject: [PATCH 3/8] configure: do not build gmock, speeds up configuration &
+ compilation by quite a fair bit
+
+---
+ configure | 5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
+
+diff --git a/configure b/configure
+index 09b3c18..18a7554 100755
+--- a/configure
++++ b/configure
+@@ -820,7 +820,7 @@ CCC
+ CXXCPP
+ OBJC
+ OBJCFLAGS'
+-ac_subdirs_all='gmock'
++ac_subdirs_all=''
+ 
+ # Initialize some variables set by options.
+ ac_init_help=
+@@ -17673,9 +17673,6 @@ export CFLAGS
+ export CXXFLAGS
+ 
+ 
+-subdirs="$subdirs gmock"
+-
+-
+ ac_config_files="$ac_config_files Makefile src/Makefile benchmarks/Makefile conformance/Makefile protobuf.pc protobuf-lite.pc"
+ 
+ cat >confcache <<\_ACEOF
+-- 
+2.29.2
+

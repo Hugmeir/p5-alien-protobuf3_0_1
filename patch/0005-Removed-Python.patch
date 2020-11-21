@@ -1,0 +1,3111 @@
+From bb166df6049bd193fae6d39c931e275f750d9fa3 Mon Sep 17 00:00:00 2001
+From: Brian Fraser <brian.fraser@booking.com>
+Date: Sat, 21 Nov 2020 18:55:30 +0100
+Subject: [PATCH 5/8] Removed Python
+
+---
+ BUILD                                         |  184 ---
+ Makefile.am                                   |  107 +-
+ Makefile.in                                   |  107 +-
+ cmake/extract_includes.bat.in                 |    2 -
+ cmake/libprotoc.cmake                         |    1 -
+ cmake/protobuf-module.cmake.in                |   47 -
+ cmake/tests.cmake                             |    1 -
+ configure                                     |    2 +-
+ configure.ac                                  |    3 +-
+ conformance/Makefile.am                       |   20 +-
+ conformance/Makefile.in                       |   20 +-
+ conformance/conformance_python.py             |  134 --
+ conformance/failure_list_python-post26.txt    |    2 -
+ conformance/failure_list_python.txt           |   19 -
+ conformance/failure_list_python_cpp.txt       |   44 -
+ examples/Makefile                             |   20 +-
+ examples/add_person.py                        |   56 -
+ examples/list_people.py                       |   37 -
+ src/Makefile.am                               |    3 -
+ src/Makefile.in                               |   43 +-
+ .../compiler/python/python_generator.cc       | 1393 -----------------
+ .../compiler/python/python_generator.h        |  174 --
+ .../compiler/python/python_plugin_unittest.cc |  170 --
+ .../protobuf/compiler/zip_output_unittest.sh  |    2 +-
+ util/python/BUILD                             |   18 -
+ 25 files changed, 21 insertions(+), 2588 deletions(-)
+ delete mode 100755 conformance/conformance_python.py
+ delete mode 100644 conformance/failure_list_python-post26.txt
+ delete mode 100644 conformance/failure_list_python.txt
+ delete mode 100644 conformance/failure_list_python_cpp.txt
+ delete mode 100755 examples/add_person.py
+ delete mode 100755 examples/list_people.py
+ delete mode 100644 src/google/protobuf/compiler/python/python_generator.cc
+ delete mode 100644 src/google/protobuf/compiler/python/python_generator.h
+ delete mode 100644 src/google/protobuf/compiler/python/python_plugin_unittest.cc
+ delete mode 100644 util/python/BUILD
+
+diff --git a/BUILD b/BUILD
+index 64f86e9..5116d7a 100644
+--- a/BUILD
++++ b/BUILD
+@@ -241,7 +241,6 @@ cc_library(
+         "src/google/protobuf/compiler/php/php_generator.cc",
+         "src/google/protobuf/compiler/plugin.cc",
+         "src/google/protobuf/compiler/plugin.pb.cc",
+-        "src/google/protobuf/compiler/python/python_generator.cc",
+         "src/google/protobuf/compiler/ruby/ruby_generator.cc",
+         "src/google/protobuf/compiler/subprocess.cc",
+         "src/google/protobuf/compiler/zip_writer.cc",
+@@ -371,7 +370,6 @@ cc_test(
+         "src/google/protobuf/compiler/importer_unittest.cc",
+         "src/google/protobuf/compiler/mock_code_generator.cc",
+         "src/google/protobuf/compiler/parser_unittest.cc",
+-        "src/google/protobuf/compiler/python/python_plugin_unittest.cc",
+         "src/google/protobuf/compiler/ruby/ruby_generator_unittest.cc",
+         "src/google/protobuf/descriptor_database_unittest.cc",
+         "src/google/protobuf/descriptor_unittest.cc",
+@@ -443,68 +441,6 @@ cc_test(
+ )
+ 
+ 
+-################################################################################
+-# Python support
+-################################################################################
+-
+-py_library(
+-    name = "python_srcs",
+-    srcs = glob(
+-        [
+-            "python/google/protobuf/*.py",
+-            "python/google/protobuf/**/*.py",
+-        ],
+-        exclude = [
+-            "python/google/protobuf/__init__.py",
+-            "python/google/protobuf/**/__init__.py",
+-            "python/google/protobuf/internal/*_test.py",
+-            "python/google/protobuf/internal/test_util.py",
+-        ],
+-    ),
+-    srcs_version = "PY2AND3",
+-    imports = ["python"],
+-)
+-
+-cc_binary(
+-    name = "internal/_api_implementation.so",
+-    srcs = ["python/google/protobuf/internal/api_implementation.cc"],
+-    copts = COPTS + [
+-        "-DPYTHON_PROTO2_CPP_IMPL_V2",
+-    ],
+-    linkshared = 1,
+-    linkstatic = 1,
+-    deps = select({
+-        "//conditions:default": [],
+-        ":use_fast_cpp_protos": ["//external:python_headers"],
+-    }),
+-)
+-
+-cc_binary(
+-    name = "pyext/_message.so",
+-    srcs = glob([
+-        "python/google/protobuf/pyext/*.cc",
+-        "python/google/protobuf/pyext/*.h",
+-    ]),
+-    copts = COPTS + [
+-        "-DGOOGLE_PROTOBUF_HAS_ONEOF=1",
+-    ] + select({
+-        "//conditions:default": [],
+-        ":allow_oversize_protos": ["-DPROTOBUF_PYTHON_ALLOW_OVERSIZE_PROTOS=1"],
+-    }),
+-    includes = [
+-        "python/",
+-        "src/",
+-    ],
+-    linkshared = 1,
+-    linkstatic = 1,
+-    deps = [
+-        ":protobuf",
+-    ] + select({
+-        "//conditions:default": [],
+-        ":use_fast_cpp_protos": ["//external:python_headers"],
+-    }),
+-)
+-
+ config_setting(
+     name = "use_fast_cpp_protos",
+     values = {
+@@ -518,123 +454,3 @@ config_setting(
+         "define": "allow_oversize_protos=true",
+     },
+ )
+-
+-# Copy the builtin proto files from src/google/protobuf to
+-# python/google/protobuf. This way, the generated Python sources will be in the
+-# same directory as the Python runtime sources. This is necessary for the
+-# modules to be imported correctly since they are all part of the same Python
+-# package.
+-internal_copied_filegroup(
+-    name = "protos_python",
+-    srcs = WELL_KNOWN_PROTOS,
+-    strip_prefix = "src",
+-    dest = "python",
+-)
+-
+-# TODO(dzc): Remove this once py_proto_library can have labels in srcs, in
+-# which case we can simply add :protos_python in srcs.
+-COPIED_WELL_KNOWN_PROTOS = ["python/" + s for s in RELATIVE_WELL_KNOWN_PROTOS]
+-
+-py_proto_library(
+-    name = "protobuf_python",
+-    srcs = COPIED_WELL_KNOWN_PROTOS,
+-    include = "python",
+-    data = select({
+-        "//conditions:default": [],
+-        ":use_fast_cpp_protos": [
+-            ":internal/_api_implementation.so",
+-            ":pyext/_message.so",
+-        ],
+-    }),
+-    default_runtime = "",
+-    protoc = ":protoc",
+-    py_libs = [
+-        ":python_srcs",
+-        "//external:six"
+-    ],
+-    srcs_version = "PY2AND3",
+-    visibility = ["//visibility:public"],
+-)
+-
+-# Copy the test proto files from src/google/protobuf to
+-# python/google/protobuf. This way, the generated Python sources will be in the
+-# same directory as the Python runtime sources. This is necessary for the
+-# modules to be imported correctly by the tests since they are all part of the
+-# same Python package.
+-internal_copied_filegroup(
+-    name = "protos_python_test",
+-    srcs = LITE_TEST_PROTOS + TEST_PROTOS,
+-    strip_prefix = "src",
+-    dest = "python",
+-)
+-
+-# TODO(dzc): Remove this once py_proto_library can have labels in srcs, in
+-# which case we can simply add :protos_python_test in srcs.
+-COPIED_LITE_TEST_PROTOS = ["python/" + s for s in RELATIVE_LITE_TEST_PROTOS]
+-COPIED_TEST_PROTOS = ["python/" + s for s in RELATIVE_TEST_PROTOS]
+-
+-py_proto_library(
+-    name = "python_common_test_protos",
+-    srcs = COPIED_LITE_TEST_PROTOS + COPIED_TEST_PROTOS,
+-    include = "python",
+-    default_runtime = "",
+-    protoc = ":protoc",
+-    srcs_version = "PY2AND3",
+-    deps = [":protobuf_python"],
+-)
+-
+-py_proto_library(
+-    name = "python_specific_test_protos",
+-    srcs = glob([
+-        "python/google/protobuf/internal/*.proto",
+-        "python/google/protobuf/internal/import_test_package/*.proto",
+-    ]),
+-    include = "python",
+-    default_runtime = ":protobuf_python",
+-    protoc = ":protoc",
+-    srcs_version = "PY2AND3",
+-    deps = [":python_common_test_protos"],
+-)
+-
+-py_library(
+-    name = "python_tests",
+-    srcs = glob(
+-        [
+-            "python/google/protobuf/internal/*_test.py",
+-            "python/google/protobuf/internal/test_util.py",
+-            "python/google/protobuf/internal/import_test_package/__init__.py",
+-        ],
+-    ),
+-    imports = ["python"],
+-    srcs_version = "PY2AND3",
+-    deps = [
+-        ":protobuf_python",
+-        ":python_common_test_protos",
+-        ":python_specific_test_protos",
+-    ],
+-)
+-
+-internal_protobuf_py_tests(
+-    name = "python_tests_batch",
+-    data = glob([
+-        "src/google/protobuf/**/*",
+-    ]),
+-    modules = [
+-        "descriptor_database_test",
+-        "descriptor_pool_test",
+-        "descriptor_test",
+-        "generator_test",
+-        "json_format_test",
+-        "message_factory_test",
+-        "message_test",
+-        "proto_builder_test",
+-        "reflection_test",
+-        "service_reflection_test",
+-        "symbol_database_test",
+-        "text_encoding_test",
+-        "text_format_test",
+-        "unknown_fields_test",
+-        "wire_format_test",
+-    ],
+-    deps = [":python_tests"],
+-)
+diff --git a/Makefile.am b/Makefile.am
+index 2d9c657..f7ae455 100644
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -95,108 +95,6 @@ php_EXTRA_DIST=                                              \
+   phpunit.xml                                                \
+   composer.json
+ 
+-python_EXTRA_DIST=                                                           \
+-  python/MANIFEST.in                                                         \
+-  python/google/__init__.py                                                  \
+-  python/google/protobuf/__init__.py                                         \
+-  python/google/protobuf/descriptor.py                                       \
+-  python/google/protobuf/descriptor_database.py                              \
+-  python/google/protobuf/descriptor_pool.py                                  \
+-  python/google/protobuf/internal/__init__.py                                \
+-  python/google/protobuf/internal/_parameterized.py                          \
+-  python/google/protobuf/internal/any_test.proto                             \
+-  python/google/protobuf/internal/any_test.proto                             \
+-  python/google/protobuf/internal/api_implementation.cc                      \
+-  python/google/protobuf/internal/api_implementation.py                      \
+-  python/google/protobuf/internal/containers.py                              \
+-  python/google/protobuf/internal/decoder.py                                 \
+-  python/google/protobuf/internal/descriptor_database_test.py                \
+-  python/google/protobuf/internal/descriptor_pool_test.py                    \
+-  python/google/protobuf/internal/descriptor_pool_test1.proto                \
+-  python/google/protobuf/internal/descriptor_pool_test2.proto                \
+-  python/google/protobuf/internal/descriptor_test.py                         \
+-  python/google/protobuf/internal/encoder.py                                 \
+-  python/google/protobuf/internal/enum_type_wrapper.py                       \
+-  python/google/protobuf/internal/factory_test1.proto                        \
+-  python/google/protobuf/internal/factory_test2.proto                        \
+-  python/google/protobuf/internal/file_options_test.proto                    \
+-  python/google/protobuf/internal/generator_test.py                          \
+-  python/google/protobuf/internal/import_test_package/__init__.py            \
+-  python/google/protobuf/internal/import_test_package/inner.proto            \
+-  python/google/protobuf/internal/import_test_package/outer.proto            \
+-  python/google/protobuf/internal/json_format_test.py                        \
+-  python/google/protobuf/internal/message_factory_test.py                    \
+-  python/google/protobuf/internal/message_listener.py                        \
+-  python/google/protobuf/internal/message_set_extensions.proto               \
+-  python/google/protobuf/internal/message_test.py                            \
+-  python/google/protobuf/internal/missing_enum_values.proto                  \
+-  python/google/protobuf/internal/more_extensions.proto                      \
+-  python/google/protobuf/internal/more_extensions_dynamic.proto              \
+-  python/google/protobuf/internal/more_messages.proto                        \
+-  python/google/protobuf/internal/packed_field_test.proto                    \
+-  python/google/protobuf/internal/proto_builder_test.py                      \
+-  python/google/protobuf/internal/python_message.py                          \
+-  python/google/protobuf/internal/reflection_test.py                         \
+-  python/google/protobuf/internal/service_reflection_test.py                 \
+-  python/google/protobuf/internal/symbol_database_test.py                    \
+-  python/google/protobuf/internal/test_bad_identifiers.proto                 \
+-  python/google/protobuf/internal/test_util.py                               \
+-  python/google/protobuf/internal/testing_refleaks.py                        \
+-  python/google/protobuf/internal/text_encoding_test.py                      \
+-  python/google/protobuf/internal/text_format_test.py                        \
+-  python/google/protobuf/internal/type_checkers.py                           \
+-  python/google/protobuf/internal/unknown_fields_test.py                     \
+-  python/google/protobuf/internal/well_known_types.py                        \
+-  python/google/protobuf/internal/well_known_types.py                        \
+-  python/google/protobuf/internal/well_known_types_test.py                   \
+-  python/google/protobuf/internal/well_known_types_test.py                   \
+-  python/google/protobuf/internal/wire_format.py                             \
+-  python/google/protobuf/internal/wire_format_test.py                        \
+-  python/google/protobuf/json_format.py                                      \
+-  python/google/protobuf/message.py                                          \
+-  python/google/protobuf/message_factory.py                                  \
+-  python/google/protobuf/proto_builder.py                                    \
+-  python/google/protobuf/pyext/README                                        \
+-  python/google/protobuf/pyext/__init__.py                                   \
+-  python/google/protobuf/pyext/cpp_message.py                                \
+-  python/google/protobuf/pyext/descriptor.cc                                 \
+-  python/google/protobuf/pyext/descriptor.h                                  \
+-  python/google/protobuf/pyext/descriptor_containers.cc                      \
+-  python/google/protobuf/pyext/descriptor_containers.h                       \
+-  python/google/protobuf/pyext/descriptor_database.cc                        \
+-  python/google/protobuf/pyext/descriptor_database.h                         \
+-  python/google/protobuf/pyext/descriptor_pool.cc                            \
+-  python/google/protobuf/pyext/descriptor_pool.h                             \
+-  python/google/protobuf/pyext/extension_dict.cc                             \
+-  python/google/protobuf/pyext/extension_dict.h                              \
+-  python/google/protobuf/pyext/map_container.cc                              \
+-  python/google/protobuf/pyext/map_container.h                               \
+-  python/google/protobuf/pyext/message.cc                                    \
+-  python/google/protobuf/pyext/message.h                                     \
+-  python/google/protobuf/pyext/message_factory.cc                            \
+-  python/google/protobuf/pyext/message_factory.h                             \
+-  python/google/protobuf/pyext/message_module.cc                             \
+-  python/google/protobuf/pyext/proto2_api_test.proto                         \
+-  python/google/protobuf/pyext/python.proto                                  \
+-  python/google/protobuf/pyext/python_protobuf.h                             \
+-  python/google/protobuf/pyext/repeated_composite_container.cc               \
+-  python/google/protobuf/pyext/repeated_composite_container.h                \
+-  python/google/protobuf/pyext/repeated_scalar_container.cc                  \
+-  python/google/protobuf/pyext/repeated_scalar_container.h                   \
+-  python/google/protobuf/pyext/scoped_pyobject_ptr.h                         \
+-  python/google/protobuf/reflection.py                                       \
+-  python/google/protobuf/service.py                                          \
+-  python/google/protobuf/service_reflection.py                               \
+-  python/google/protobuf/symbol_database.py                                  \
+-  python/google/protobuf/text_encoding.py                                    \
+-  python/google/protobuf/text_format.py                                      \
+-  python/mox.py                                                              \
+-  python/setup.cfg                                                           \
+-  python/setup.py                                                            \
+-  python/stubout.py                                                          \
+-  python/tox.ini                                                             \
+-  python/README.md
+-
+ ruby_EXTRA_DIST=                                                             \
+   ruby/Gemfile                                                               \
+   ruby/Gemfile.lock                                                          \
+@@ -275,7 +173,7 @@ js_EXTRA_DIST=                              \
+   js/testbinary.proto                       \
+   js/testempty.proto
+ 
+-all_EXTRA_DIST=$(php_EXTRA_DIST) $(python_EXTRA_DIST) $(ruby_EXTRA_DIST) $(js_EXTRA_DIST)
++all_EXTRA_DIST=$(php_EXTRA_DIST) $(ruby_EXTRA_DIST) $(js_EXTRA_DIST)
+ 
+ EXTRA_DIST = $(@DIST_LANG@_EXTRA_DIST)   \
+   autogen.sh                             \
+@@ -319,8 +217,7 @@ EXTRA_DIST = $(@DIST_LANG@_EXTRA_DIST)   \
+   examples/list_people.py                \
+   examples/list_people_test.go           \
+   protobuf.bzl                           \
+-  six.BUILD                              \
+-  util/python/BUILD
++  six.BUILD
+ 
+ # Deletes all the files generated by autogen.sh.
+ MAINTAINERCLEANFILES =   \
+diff --git a/Makefile.in b/Makefile.in
+index 24ea366..ac5d36b 100644
+--- a/Makefile.in
++++ b/Makefile.in
+@@ -422,108 +422,6 @@ php_EXTRA_DIST = \
+   phpunit.xml                                                \
+   composer.json
+ 
+-python_EXTRA_DIST = \
+-  python/MANIFEST.in                                                         \
+-  python/google/__init__.py                                                  \
+-  python/google/protobuf/__init__.py                                         \
+-  python/google/protobuf/descriptor.py                                       \
+-  python/google/protobuf/descriptor_database.py                              \
+-  python/google/protobuf/descriptor_pool.py                                  \
+-  python/google/protobuf/internal/__init__.py                                \
+-  python/google/protobuf/internal/_parameterized.py                          \
+-  python/google/protobuf/internal/any_test.proto                             \
+-  python/google/protobuf/internal/any_test.proto                             \
+-  python/google/protobuf/internal/api_implementation.cc                      \
+-  python/google/protobuf/internal/api_implementation.py                      \
+-  python/google/protobuf/internal/containers.py                              \
+-  python/google/protobuf/internal/decoder.py                                 \
+-  python/google/protobuf/internal/descriptor_database_test.py                \
+-  python/google/protobuf/internal/descriptor_pool_test.py                    \
+-  python/google/protobuf/internal/descriptor_pool_test1.proto                \
+-  python/google/protobuf/internal/descriptor_pool_test2.proto                \
+-  python/google/protobuf/internal/descriptor_test.py                         \
+-  python/google/protobuf/internal/encoder.py                                 \
+-  python/google/protobuf/internal/enum_type_wrapper.py                       \
+-  python/google/protobuf/internal/factory_test1.proto                        \
+-  python/google/protobuf/internal/factory_test2.proto                        \
+-  python/google/protobuf/internal/file_options_test.proto                    \
+-  python/google/protobuf/internal/generator_test.py                          \
+-  python/google/protobuf/internal/import_test_package/__init__.py            \
+-  python/google/protobuf/internal/import_test_package/inner.proto            \
+-  python/google/protobuf/internal/import_test_package/outer.proto            \
+-  python/google/protobuf/internal/json_format_test.py                        \
+-  python/google/protobuf/internal/message_factory_test.py                    \
+-  python/google/protobuf/internal/message_listener.py                        \
+-  python/google/protobuf/internal/message_set_extensions.proto               \
+-  python/google/protobuf/internal/message_test.py                            \
+-  python/google/protobuf/internal/missing_enum_values.proto                  \
+-  python/google/protobuf/internal/more_extensions.proto                      \
+-  python/google/protobuf/internal/more_extensions_dynamic.proto              \
+-  python/google/protobuf/internal/more_messages.proto                        \
+-  python/google/protobuf/internal/packed_field_test.proto                    \
+-  python/google/protobuf/internal/proto_builder_test.py                      \
+-  python/google/protobuf/internal/python_message.py                          \
+-  python/google/protobuf/internal/reflection_test.py                         \
+-  python/google/protobuf/internal/service_reflection_test.py                 \
+-  python/google/protobuf/internal/symbol_database_test.py                    \
+-  python/google/protobuf/internal/test_bad_identifiers.proto                 \
+-  python/google/protobuf/internal/test_util.py                               \
+-  python/google/protobuf/internal/testing_refleaks.py                        \
+-  python/google/protobuf/internal/text_encoding_test.py                      \
+-  python/google/protobuf/internal/text_format_test.py                        \
+-  python/google/protobuf/internal/type_checkers.py                           \
+-  python/google/protobuf/internal/unknown_fields_test.py                     \
+-  python/google/protobuf/internal/well_known_types.py                        \
+-  python/google/protobuf/internal/well_known_types.py                        \
+-  python/google/protobuf/internal/well_known_types_test.py                   \
+-  python/google/protobuf/internal/well_known_types_test.py                   \
+-  python/google/protobuf/internal/wire_format.py                             \
+-  python/google/protobuf/internal/wire_format_test.py                        \
+-  python/google/protobuf/json_format.py                                      \
+-  python/google/protobuf/message.py                                          \
+-  python/google/protobuf/message_factory.py                                  \
+-  python/google/protobuf/proto_builder.py                                    \
+-  python/google/protobuf/pyext/README                                        \
+-  python/google/protobuf/pyext/__init__.py                                   \
+-  python/google/protobuf/pyext/cpp_message.py                                \
+-  python/google/protobuf/pyext/descriptor.cc                                 \
+-  python/google/protobuf/pyext/descriptor.h                                  \
+-  python/google/protobuf/pyext/descriptor_containers.cc                      \
+-  python/google/protobuf/pyext/descriptor_containers.h                       \
+-  python/google/protobuf/pyext/descriptor_database.cc                        \
+-  python/google/protobuf/pyext/descriptor_database.h                         \
+-  python/google/protobuf/pyext/descriptor_pool.cc                            \
+-  python/google/protobuf/pyext/descriptor_pool.h                             \
+-  python/google/protobuf/pyext/extension_dict.cc                             \
+-  python/google/protobuf/pyext/extension_dict.h                              \
+-  python/google/protobuf/pyext/map_container.cc                              \
+-  python/google/protobuf/pyext/map_container.h                               \
+-  python/google/protobuf/pyext/message.cc                                    \
+-  python/google/protobuf/pyext/message.h                                     \
+-  python/google/protobuf/pyext/message_factory.cc                            \
+-  python/google/protobuf/pyext/message_factory.h                             \
+-  python/google/protobuf/pyext/message_module.cc                             \
+-  python/google/protobuf/pyext/proto2_api_test.proto                         \
+-  python/google/protobuf/pyext/python.proto                                  \
+-  python/google/protobuf/pyext/python_protobuf.h                             \
+-  python/google/protobuf/pyext/repeated_composite_container.cc               \
+-  python/google/protobuf/pyext/repeated_composite_container.h                \
+-  python/google/protobuf/pyext/repeated_scalar_container.cc                  \
+-  python/google/protobuf/pyext/repeated_scalar_container.h                   \
+-  python/google/protobuf/pyext/scoped_pyobject_ptr.h                         \
+-  python/google/protobuf/reflection.py                                       \
+-  python/google/protobuf/service.py                                          \
+-  python/google/protobuf/service_reflection.py                               \
+-  python/google/protobuf/symbol_database.py                                  \
+-  python/google/protobuf/text_encoding.py                                    \
+-  python/google/protobuf/text_format.py                                      \
+-  python/mox.py                                                              \
+-  python/setup.cfg                                                           \
+-  python/setup.py                                                            \
+-  python/stubout.py                                                          \
+-  python/tox.ini                                                             \
+-  python/README.md
+-
+ ruby_EXTRA_DIST = \
+   ruby/Gemfile                                                               \
+   ruby/Gemfile.lock                                                          \
+@@ -602,7 +500,7 @@ js_EXTRA_DIST = \
+   js/testbinary.proto                       \
+   js/testempty.proto
+ 
+-all_EXTRA_DIST = $(php_EXTRA_DIST) $(python_EXTRA_DIST) $(ruby_EXTRA_DIST) $(js_EXTRA_DIST)
++all_EXTRA_DIST = $(php_EXTRA_DIST) $(ruby_EXTRA_DIST) $(js_EXTRA_DIST)
+ EXTRA_DIST = $(@DIST_LANG@_EXTRA_DIST)   \
+   autogen.sh                             \
+   generate_descriptor_proto.sh           \
+@@ -645,8 +543,7 @@ EXTRA_DIST = $(@DIST_LANG@_EXTRA_DIST)   \
+   examples/list_people.py                \
+   examples/list_people_test.go           \
+   protobuf.bzl                           \
+-  six.BUILD                              \
+-  util/python/BUILD
++  six.BUILD
+ 
+ 
+ # Deletes all the files generated by autogen.sh.
+diff --git a/cmake/extract_includes.bat.in b/cmake/extract_includes.bat.in
+index 83a5d65..a7b4577 100644
+--- a/cmake/extract_includes.bat.in
++++ b/cmake/extract_includes.bat.in
+@@ -5,7 +5,6 @@ mkdir include\google\protobuf\compiler
+ mkdir include\google\protobuf\compiler\cpp
+ mkdir include\google\protobuf\compiler\js
+ mkdir include\google\protobuf\compiler\php
+-mkdir include\google\protobuf\compiler\python
+ mkdir include\google\protobuf\compiler\ruby
+ mkdir include\google\protobuf\io
+ mkdir include\google\protobuf\stubs
+@@ -24,7 +23,6 @@ copy ${PROTOBUF_SOURCE_WIN32_PATH}\..\src\google\protobuf\compiler\parser.h incl
+ copy ${PROTOBUF_SOURCE_WIN32_PATH}\..\src\google\protobuf\compiler\php\php_generator.h include\google\protobuf\compiler\php\php_generator.h
+ copy ${PROTOBUF_SOURCE_WIN32_PATH}\..\src\google\protobuf\compiler\plugin.h include\google\protobuf\compiler\plugin.h
+ copy ${PROTOBUF_SOURCE_WIN32_PATH}\..\src\google\protobuf\compiler\plugin.pb.h include\google\protobuf\compiler\plugin.pb.h
+-copy ${PROTOBUF_SOURCE_WIN32_PATH}\..\src\google\protobuf\compiler\python\python_generator.h include\google\protobuf\compiler\python\python_generator.h
+ copy ${PROTOBUF_SOURCE_WIN32_PATH}\..\src\google\protobuf\compiler\ruby\ruby_generator.h include\google\protobuf\compiler\ruby\ruby_generator.h
+ copy ${PROTOBUF_SOURCE_WIN32_PATH}\..\src\google\protobuf\descriptor.h include\google\protobuf\descriptor.h
+ copy ${PROTOBUF_SOURCE_WIN32_PATH}\..\src\google\protobuf\descriptor.pb.h include\google\protobuf\descriptor.pb.h
+diff --git a/cmake/libprotoc.cmake b/cmake/libprotoc.cmake
+index b6fb764..7b94940 100644
+--- a/cmake/libprotoc.cmake
++++ b/cmake/libprotoc.cmake
+@@ -18,7 +18,6 @@ set(libprotoc_files
+   ${protobuf_source_dir}/src/google/protobuf/compiler/php/php_generator.cc
+   ${protobuf_source_dir}/src/google/protobuf/compiler/plugin.cc
+   ${protobuf_source_dir}/src/google/protobuf/compiler/plugin.pb.cc
+-  ${protobuf_source_dir}/src/google/protobuf/compiler/python/python_generator.cc
+   ${protobuf_source_dir}/src/google/protobuf/compiler/ruby/ruby_generator.cc
+   ${protobuf_source_dir}/src/google/protobuf/compiler/subprocess.cc
+   ${protobuf_source_dir}/src/google/protobuf/compiler/zip_writer.cc
+diff --git a/cmake/protobuf-module.cmake.in b/cmake/protobuf-module.cmake.in
+index 614e4c0..c345803 100644
+--- a/cmake/protobuf-module.cmake.in
++++ b/cmake/protobuf-module.cmake.in
+@@ -54,53 +54,6 @@ function(PROTOBUF_GENERATE_CPP SRCS HDRS)
+   set(${HDRS} ${${HDRS}} PARENT_SCOPE)
+ endfunction()
+ 
+-function(PROTOBUF_GENERATE_PYTHON SRCS)
+-  if(NOT ARGN)
+-    message(SEND_ERROR "Error: PROTOBUF_GENERATE_PYTHON() called without any proto files")
+-    return()
+-  endif()
+-
+-  if(PROTOBUF_GENERATE_CPP_APPEND_PATH)
+-    # Create an include path for each file specified
+-    foreach(FIL ${ARGN})
+-      get_filename_component(ABS_FIL ${FIL} ABSOLUTE)
+-      get_filename_component(ABS_PATH ${ABS_FIL} PATH)
+-      list(FIND _protobuf_include_path ${ABS_PATH} _contains_already)
+-      if(${_contains_already} EQUAL -1)
+-          list(APPEND _protobuf_include_path -I ${ABS_PATH})
+-      endif()
+-    endforeach()
+-  else()
+-    set(_protobuf_include_path -I ${CMAKE_CURRENT_SOURCE_DIR})
+-  endif()
+-
+-  if(DEFINED Protobuf_IMPORT_DIRS)
+-    foreach(DIR ${Protobuf_IMPORT_DIRS})
+-      get_filename_component(ABS_PATH ${DIR} ABSOLUTE)
+-      list(FIND _protobuf_include_path ${ABS_PATH} _contains_already)
+-      if(${_contains_already} EQUAL -1)
+-          list(APPEND _protobuf_include_path -I ${ABS_PATH})
+-      endif()
+-    endforeach()
+-  endif()
+-
+-  set(${SRCS})
+-  foreach(FIL ${ARGN})
+-    get_filename_component(ABS_FIL ${FIL} ABSOLUTE)
+-    get_filename_component(FIL_WE ${FIL} NAME_WE)
+-
+-    list(APPEND ${SRCS} "${CMAKE_CURRENT_BINARY_DIR}/${FIL_WE}_pb2.py")
+-    add_custom_command(
+-      OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${FIL_WE}_pb2.py"
+-      COMMAND  ${Protobuf_PROTOC_EXECUTABLE} --python_out ${CMAKE_CURRENT_BINARY_DIR} ${_protobuf_include_path} ${ABS_FIL}
+-      DEPENDS ${ABS_FIL} ${Protobuf_PROTOC_EXECUTABLE}
+-      COMMENT "Running Python protocol buffer compiler on ${FIL}"
+-      VERBATIM )
+-  endforeach()
+-
+-  set(${SRCS} ${${SRCS}} PARENT_SCOPE)
+-endfunction()
+-
+ # Environment
+ 
+ # Backwards compatibility
+diff --git a/cmake/tests.cmake b/cmake/tests.cmake
+index 0efc84e..51ba820 100644
+--- a/cmake/tests.cmake
++++ b/cmake/tests.cmake
+@@ -125,7 +125,6 @@ set(tests_files
+   ${protobuf_source_dir}/src/google/protobuf/compiler/importer_unittest.cc
+   ${protobuf_source_dir}/src/google/protobuf/compiler/mock_code_generator.cc
+   ${protobuf_source_dir}/src/google/protobuf/compiler/parser_unittest.cc
+-  ${protobuf_source_dir}/src/google/protobuf/compiler/python/python_plugin_unittest.cc
+   ${protobuf_source_dir}/src/google/protobuf/compiler/ruby/ruby_generator_unittest.cc
+   ${protobuf_source_dir}/src/google/protobuf/descriptor_database_unittest.cc
+   ${protobuf_source_dir}/src/google/protobuf/descriptor_unittest.cc
+diff --git a/configure b/configure
+index 90ad132..7c98c7f 100755
+--- a/configure
++++ b/configure
+@@ -2570,7 +2570,7 @@ ac_config_headers="$ac_config_headers config.h"
+ 
+ case "$DIST_LANG" in
+   "") DIST_LANG=all ;;
+-  all | cpp | python | ruby | js | php) ;;
++  all | cpp | ruby | js | php) ;;
+   *) { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+ $as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+ as_fn_error $? "unknown language: $DIST_LANG
+diff --git a/configure.ac b/configure.ac
+index a863f25..2b2c12a 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -8,7 +8,6 @@ AC_PREREQ(2.59)
+ # * csharp/Google.Protobuf.Tools.nuspec
+ # * csharp/src/*/AssemblyInfo.cs
+ # * csharp/src/Google.Protobuf/Google.Protobuf.nuspec
+-# * python/google/protobuf/__init__.py
+ # * protoc-artifacts/pom.xml
+ # * src/google/protobuf/stubs/common.h
+ # * src/Makefile.am (Update -version-info for LDFLAGS if needed)
+@@ -30,7 +29,7 @@ AC_CONFIG_MACRO_DIR([m4])
+ AC_ARG_VAR(DIST_LANG, [language to include in the distribution package (i.e., make dist)])
+ case "$DIST_LANG" in
+   "") DIST_LANG=all ;;
+-  all | cpp | csharp | python | ruby | js | php) ;;
++  all | cpp | csharp | ruby | js | php) ;;
+   *) AC_MSG_FAILURE([unknown language: $DIST_LANG]) ;;
+ esac
+ AC_SUBST(DIST_LANG)
+diff --git a/conformance/Makefile.am b/conformance/Makefile.am
+index 5fe4417..b32d220 100644
+--- a/conformance/Makefile.am
++++ b/conformance/Makefile.am
+@@ -52,12 +52,8 @@ bin_PROGRAMS = conformance-test-runner conformance-cpp
+ EXTRA_DIST =                  \
+   README.md                   \
+   conformance.proto           \
+-  conformance_python.py       \
+   conformance_ruby.rb         \
+   failure_list_cpp.txt        \
+-  failure_list_python.txt     \
+-  failure_list_python_cpp.txt \
+-  failure_list_python-post26.txt \
+   failure_list_ruby.txt
+ 
+ conformance_test_runner_LDADD = $(top_srcdir)/src/libprotobuf.la
+@@ -85,8 +81,8 @@ if USE_EXTERNAL_PROTOC
+ 
+ # Some implementations include pre-generated versions of well-known types.
+ protoc_middleman: $(conformance_protoc_inputs) $(well_known_type_protoc_inputs)
+-	$(PROTOC) -I$(srcdir) -I$(top_srcdir) --cpp_out=. --ruby_out=. --python_out=. $(conformance_protoc_inputs)
+-	$(PROTOC) -I$(srcdir) -I$(top_srcdir) --cpp_out=. --ruby_out=. --python_out=. $(well_known_type_protoc_inputs)
++	$(PROTOC) -I$(srcdir) -I$(top_srcdir) --cpp_out=. --ruby_out=. $(conformance_protoc_inputs)
++	$(PROTOC) -I$(srcdir) -I$(top_srcdir) --cpp_out=. --ruby_out=. $(well_known_type_protoc_inputs)
+ 	## $(PROTOC) -I$(srcdir) -I$(top_srcdir) $(conformance_protoc_inputs) $(well_known_type_protoc_inputs)
+ 	touch protoc_middleman
+ 
+@@ -96,8 +92,8 @@ else
+ # relative to srcdir, which may not be the same as the current directory when
+ # building out-of-tree.
+ protoc_middleman: $(top_srcdir)/src/protoc$(EXEEXT) $(conformance_protoc_inputs) $(well_known_type_protoc_inputs)
+-	oldpwd=`pwd` && ( cd $(srcdir) && $$oldpwd/../src/protoc$(EXEEXT) -I. -I$(top_srcdir)/src --cpp_out=$$oldpwd --ruby_out=$$oldpwd --python_out=$$oldpwd $(conformance_protoc_inputs) )
+-	oldpwd=`pwd` && ( cd $(srcdir) && $$oldpwd/../src/protoc$(EXEEXT) -I. -I$(top_srcdir)/src --cpp_out=$$oldpwd --ruby_out=$$oldpwd --python_out=$$oldpwd $(well_known_type_protoc_inputs) )
++	oldpwd=`pwd` && ( cd $(srcdir) && $$oldpwd/../src/protoc$(EXEEXT) -I. -I$(top_srcdir)/src --cpp_out=$$oldpwd --ruby_out=$$oldpwd $(conformance_protoc_inputs) )
++	oldpwd=`pwd` && ( cd $(srcdir) && $$oldpwd/../src/protoc$(EXEEXT) -I. -I$(top_srcdir)/src --cpp_out=$$oldpwd --ruby_out=$$oldpwd $(well_known_type_protoc_inputs) )
+ 	## @mkdir -p lite
+ 	## oldpwd=`pwd` && ( cd $(srcdir) && $$oldpwd/../src/protoc$(EXEEXT) -I. -I$(top_srcdir)/src $(conformance_protoc_inputs) $(well_known_type_protoc_inputs) )
+ 	touch protoc_middleman
+@@ -122,11 +118,3 @@ test_cpp: protoc_middleman conformance-test-runner conformance-cpp
+ test_ruby: protoc_middleman conformance-test-runner $(other_language_protoc_outputs)
+ 	RUBYLIB=../ruby/lib:. ./conformance-test-runner --enforce_recommended --failure_list failure_list_ruby.txt ./conformance_ruby.rb
+ 
+-# These depend on library paths being properly set up.  The easiest way to
+-# run them is to just use "tox" from the python dir.
+-test_python: protoc_middleman conformance-test-runner
+-	./conformance-test-runner --enforce_recommended --failure_list failure_list_python.txt ./conformance_python.py
+-
+-test_python_cpp: protoc_middleman conformance-test-runner
+-	./conformance-test-runner --enforce_recommended --failure_list failure_list_python_cpp.txt ./conformance_python.py
+-
+diff --git a/conformance/Makefile.in b/conformance/Makefile.in
+index 4e95f0a..f99995f 100644
+--- a/conformance/Makefile.in
++++ b/conformance/Makefile.in
+@@ -391,12 +391,8 @@ other_language_protoc_outputs = \
+ EXTRA_DIST = \
+   README.md                   \
+   conformance.proto           \
+-  conformance_python.py       \
+   conformance_ruby.rb         \
+   failure_list_cpp.txt        \
+-  failure_list_python.txt     \
+-  failure_list_python_cpp.txt \
+-  failure_list_python-post26.txt \
+   failure_list_ruby.txt
+ 
+ conformance_test_runner_LDADD = $(top_srcdir)/src/libprotobuf.la
+@@ -898,16 +894,16 @@ conformance_cpp-conformance_cpp.$(OBJEXT): conformance.pb.h
+ 
+ # Some implementations include pre-generated versions of well-known types.
+ @USE_EXTERNAL_PROTOC_TRUE@protoc_middleman: $(conformance_protoc_inputs) $(well_known_type_protoc_inputs)
+-@USE_EXTERNAL_PROTOC_TRUE@	$(PROTOC) -I$(srcdir) -I$(top_srcdir) --cpp_out=. --ruby_out=. --python_out=. $(conformance_protoc_inputs)
+-@USE_EXTERNAL_PROTOC_TRUE@	$(PROTOC) -I$(srcdir) -I$(top_srcdir) --cpp_out=. --ruby_out=. --python_out=. $(well_known_type_protoc_inputs)
++@USE_EXTERNAL_PROTOC_TRUE@	$(PROTOC) -I$(srcdir) -I$(top_srcdir) --cpp_out=. --ruby_out=. $(conformance_protoc_inputs)
++@USE_EXTERNAL_PROTOC_TRUE@	$(PROTOC) -I$(srcdir) -I$(top_srcdir) --cpp_out=. --ruby_out=.$(well_known_type_protoc_inputs)
+ @USE_EXTERNAL_PROTOC_TRUE@	touch protoc_middleman
+ 
+ # We have to cd to $(srcdir) before executing protoc because $(protoc_inputs) is
+ # relative to srcdir, which may not be the same as the current directory when
+ # building out-of-tree.
+ @USE_EXTERNAL_PROTOC_FALSE@protoc_middleman: $(top_srcdir)/src/protoc$(EXEEXT) $(conformance_protoc_inputs) $(well_known_type_protoc_inputs)
+-@USE_EXTERNAL_PROTOC_FALSE@	oldpwd=`pwd` && ( cd $(srcdir) && $$oldpwd/../src/protoc$(EXEEXT) -I. -I$(top_srcdir)/src --cpp_out=$$oldpwd --ruby_out=$$oldpwd --python_out=$$oldpwd $(conformance_protoc_inputs) )
+-@USE_EXTERNAL_PROTOC_FALSE@	oldpwd=`pwd` && ( cd $(srcdir) && $$oldpwd/../src/protoc$(EXEEXT) -I. -I$(top_srcdir)/src --cpp_out=$$oldpwd --ruby_out=$$oldpwd --python_out=$$oldpwd $(well_known_type_protoc_inputs) )
++@USE_EXTERNAL_PROTOC_FALSE@	oldpwd=`pwd` && ( cd $(srcdir) && $$oldpwd/../src/protoc$(EXEEXT) -I. -I$(top_srcdir)/src --cpp_out=$$oldpwd --ruby_out=$$oldpwd $(conformance_protoc_inputs) )
++@USE_EXTERNAL_PROTOC_FALSE@	oldpwd=`pwd` && ( cd $(srcdir) && $$oldpwd/../src/protoc$(EXEEXT) -I. -I$(top_srcdir)/src --cpp_out=$$oldpwd --ruby_out=$$oldpwd $(well_known_type_protoc_inputs) )
+ @USE_EXTERNAL_PROTOC_FALSE@	touch protoc_middleman
+ 
+ $(protoc_outputs): protoc_middleman
+@@ -921,14 +917,6 @@ test_cpp: protoc_middleman conformance-test-runner conformance-cpp
+ test_ruby: protoc_middleman conformance-test-runner $(other_language_protoc_outputs)
+ 	RUBYLIB=../ruby/lib:. ./conformance-test-runner --enforce_recommended --failure_list failure_list_ruby.txt ./conformance_ruby.rb
+ 
+-# These depend on library paths being properly set up.  The easiest way to
+-# run them is to just use "tox" from the python dir.
+-test_python: protoc_middleman conformance-test-runner
+-	./conformance-test-runner --enforce_recommended --failure_list failure_list_python.txt ./conformance_python.py
+-
+-test_python_cpp: protoc_middleman conformance-test-runner
+-	./conformance-test-runner --enforce_recommended --failure_list failure_list_python_cpp.txt ./conformance_python.py
+-
+ # Tell versions [3.59,3.63) of GNU make to not export all variables.
+ # Otherwise a system limit (for SysV at least) may be exceeded.
+ .NOEXPORT:
+diff --git a/conformance/conformance_python.py b/conformance/conformance_python.py
+deleted file mode 100755
+index 2f4a781..0000000
+--- a/conformance/conformance_python.py
++++ /dev/null
+@@ -1,134 +0,0 @@
+-#!/usr/bin/env python
+-#
+-# Protocol Buffers - Google's data interchange format
+-# Copyright 2008 Google Inc.  All rights reserved.
+-# https://developers.google.com/protocol-buffers/
+-#
+-# Redistribution and use in source and binary forms, with or without
+-# modification, are permitted provided that the following conditions are
+-# met:
+-#
+-#     * Redistributions of source code must retain the above copyright
+-# notice, this list of conditions and the following disclaimer.
+-#     * Redistributions in binary form must reproduce the above
+-# copyright notice, this list of conditions and the following disclaimer
+-# in the documentation and/or other materials provided with the
+-# distribution.
+-#     * Neither the name of Google Inc. nor the names of its
+-# contributors may be used to endorse or promote products derived from
+-# this software without specific prior written permission.
+-#
+-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+-# "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+-# LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+-# A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+-# OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+-# SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+-# LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+-# DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+-# THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+-# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+-# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+-
+-"""A conformance test implementation for the Python protobuf library.
+-
+-See conformance.proto for more information.
+-"""
+-
+-import struct
+-import sys
+-import os
+-from google.protobuf import message
+-from google.protobuf import json_format
+-import conformance_pb2
+-
+-sys.stdout = os.fdopen(sys.stdout.fileno(), 'wb', 0)
+-sys.stdin = os.fdopen(sys.stdin.fileno(), 'rb', 0)
+-
+-test_count = 0
+-verbose = False
+-
+-class ProtocolError(Exception):
+-  pass
+-
+-def do_test(request):
+-  test_message = conformance_pb2.TestAllTypes()
+-  response = conformance_pb2.ConformanceResponse()
+-  test_message = conformance_pb2.TestAllTypes()
+-
+-  try:
+-    if request.WhichOneof('payload') == 'protobuf_payload':
+-      try:
+-        test_message.ParseFromString(request.protobuf_payload)
+-      except message.DecodeError as e:
+-        response.parse_error = str(e)
+-        return response
+-
+-    elif request.WhichOneof('payload') == 'json_payload':
+-      try:
+-        json_format.Parse(request.json_payload, test_message)
+-      except Exception as e:
+-        response.parse_error = str(e)
+-        return response
+-
+-    else:
+-      raise ProtocolError("Request didn't have payload.")
+-
+-    if request.requested_output_format == conformance_pb2.UNSPECIFIED:
+-      raise ProtocolError("Unspecified output format")
+-
+-    elif request.requested_output_format == conformance_pb2.PROTOBUF:
+-      response.protobuf_payload = test_message.SerializeToString()
+-
+-    elif request.requested_output_format == conformance_pb2.JSON:
+-      try:
+-        response.json_payload = json_format.MessageToJson(test_message)
+-      except Exception as e:
+-        response.serialize_error = str(e)
+-        return response
+-
+-  except Exception as e:
+-    response.runtime_error = str(e)
+-
+-  return response
+-
+-def do_test_io():
+-  length_bytes = sys.stdin.read(4)
+-  if len(length_bytes) == 0:
+-    return False   # EOF
+-  elif len(length_bytes) != 4:
+-    raise IOError("I/O error")
+-
+-  # "I" is "unsigned int", so this depends on running on a platform with
+-  # 32-bit "unsigned int" type.  The Python struct module unfortunately
+-  # has no format specifier for uint32_t.
+-  length = struct.unpack("<I", length_bytes)[0]
+-  serialized_request = sys.stdin.read(length)
+-  if len(serialized_request) != length:
+-    raise IOError("I/O error")
+-
+-  request = conformance_pb2.ConformanceRequest()
+-  request.ParseFromString(serialized_request)
+-
+-  response = do_test(request)
+-
+-  serialized_response = response.SerializeToString()
+-  sys.stdout.write(struct.pack("<I", len(serialized_response)))
+-  sys.stdout.write(serialized_response)
+-  sys.stdout.flush()
+-
+-  if verbose:
+-    sys.stderr.write("conformance_python: request=%s, response=%s\n" % (
+-                       request.ShortDebugString().c_str(),
+-                       response.ShortDebugString().c_str()))
+-
+-  global test_count
+-  test_count += 1
+-
+-  return True
+-
+-while True:
+-  if not do_test_io():
+-    sys.stderr.write("conformance_python: received EOF from test runner " +
+-                     "after %s tests, exiting\n" % (test_count))
+-    sys.exit(0)
+diff --git a/conformance/failure_list_python-post26.txt b/conformance/failure_list_python-post26.txt
+deleted file mode 100644
+index 19d99b0..0000000
+--- a/conformance/failure_list_python-post26.txt
++++ /dev/null
+@@ -1,2 +0,0 @@
+-JsonInput.StringFieldSurrogateInWrongOrder
+-JsonInput.StringFieldUnpairedHighSurrogate
+diff --git a/conformance/failure_list_python.txt b/conformance/failure_list_python.txt
+deleted file mode 100644
+index 0498519..0000000
+--- a/conformance/failure_list_python.txt
++++ /dev/null
+@@ -1,19 +0,0 @@
+-Recommended.JsonInput.DoubleFieldInfinityNotQuoted
+-Recommended.JsonInput.DoubleFieldNanNotQuoted
+-Recommended.JsonInput.DoubleFieldNegativeInfinityNotQuoted
+-Recommended.JsonInput.FieldNameWithDoubleUnderscores.JsonOutput
+-Recommended.JsonInput.FieldNameWithDoubleUnderscores.ProtobufOutput
+-Recommended.JsonInput.FieldNameWithDoubleUnderscores.Validator
+-Recommended.JsonInput.FloatFieldInfinityNotQuoted
+-Recommended.JsonInput.FloatFieldNanNotQuoted
+-Recommended.JsonInput.FloatFieldNegativeInfinityNotQuoted
+-Required.JsonInput.BytesFieldInvalidBase64Characters
+-Required.JsonInput.DoubleFieldTooSmall
+-Required.JsonInput.EnumFieldUnknownValue.Validator
+-Required.JsonInput.FieldNameInLowerCamelCase.Validator
+-Required.JsonInput.FieldNameInSnakeCase.JsonOutput
+-Required.JsonInput.FieldNameInSnakeCase.ProtobufOutput
+-Required.JsonInput.FloatFieldTooLarge
+-Required.JsonInput.FloatFieldTooSmall
+-Required.JsonInput.RepeatedFieldWrongElementTypeExpectingIntegersGotBool
+-Required.JsonInput.TimestampJsonInputLowercaseT
+diff --git a/conformance/failure_list_python_cpp.txt b/conformance/failure_list_python_cpp.txt
+deleted file mode 100644
+index f3958f5..0000000
+--- a/conformance/failure_list_python_cpp.txt
++++ /dev/null
+@@ -1,44 +0,0 @@
+-# This is the list of conformance tests that are known to fail for the
+-# Python/C++ implementation right now.  These should be fixed.
+-#
+-# By listing them here we can keep tabs on which ones are failing and be sure
+-# that we don't introduce regressions in other tests.
+-#
+-# TODO(haberman): insert links to corresponding bugs tracking the issue.
+-# Should we use GitHub issues or the Google-internal bug tracker?
+-
+-Recommended.JsonInput.DoubleFieldInfinityNotQuoted
+-Recommended.JsonInput.DoubleFieldNanNotQuoted
+-Recommended.JsonInput.DoubleFieldNegativeInfinityNotQuoted
+-Recommended.JsonInput.FieldNameWithDoubleUnderscores.JsonOutput
+-Recommended.JsonInput.FieldNameWithDoubleUnderscores.ProtobufOutput
+-Recommended.JsonInput.FieldNameWithDoubleUnderscores.Validator
+-Recommended.JsonInput.FloatFieldInfinityNotQuoted
+-Recommended.JsonInput.FloatFieldNanNotQuoted
+-Recommended.JsonInput.FloatFieldNegativeInfinityNotQuoted
+-Required.JsonInput.BytesFieldInvalidBase64Characters
+-Required.JsonInput.DoubleFieldTooSmall
+-Required.JsonInput.EnumFieldUnknownValue.Validator
+-Required.JsonInput.FieldNameInLowerCamelCase.Validator
+-Required.JsonInput.FieldNameInSnakeCase.JsonOutput
+-Required.JsonInput.FieldNameInSnakeCase.ProtobufOutput
+-Required.JsonInput.FloatFieldTooLarge
+-Required.JsonInput.FloatFieldTooSmall
+-Required.JsonInput.RepeatedFieldWrongElementTypeExpectingIntegersGotBool
+-Required.JsonInput.TimestampJsonInputLowercaseT
+-Required.ProtobufInput.PrematureEofInDelimitedDataForKnownNonRepeatedValue.MESSAGE
+-Required.ProtobufInput.PrematureEofInDelimitedDataForKnownRepeatedValue.MESSAGE
+-Required.ProtobufInput.PrematureEofInPackedField.BOOL
+-Required.ProtobufInput.PrematureEofInPackedField.DOUBLE
+-Required.ProtobufInput.PrematureEofInPackedField.ENUM
+-Required.ProtobufInput.PrematureEofInPackedField.FIXED32
+-Required.ProtobufInput.PrematureEofInPackedField.FIXED64
+-Required.ProtobufInput.PrematureEofInPackedField.FLOAT
+-Required.ProtobufInput.PrematureEofInPackedField.INT32
+-Required.ProtobufInput.PrematureEofInPackedField.INT64
+-Required.ProtobufInput.PrematureEofInPackedField.SFIXED32
+-Required.ProtobufInput.PrematureEofInPackedField.SFIXED64
+-Required.ProtobufInput.PrematureEofInPackedField.SINT32
+-Required.ProtobufInput.PrematureEofInPackedField.SINT64
+-Required.ProtobufInput.PrematureEofInPackedField.UINT32
+-Required.ProtobufInput.PrematureEofInPackedField.UINT64
+diff --git a/examples/Makefile b/examples/Makefile
+index e994790..6177c1f 100644
+--- a/examples/Makefile
++++ b/examples/Makefile
+@@ -1,16 +1,15 @@
+ # See README.txt.
+ 
+-.PHONY: all cpp python clean
++.PHONY: all cpp clean
+ 
+-all: cpp python
++all: cpp
+ 
+ cpp:    add_person_cpp    list_people_cpp
+ go:     add_person_go     list_people_go
+ gotest: add_person_gotest list_people_gotest
+-python: add_person_python list_people_python
+ 
+ clean:
+-	rm -f add_person_cpp list_people_cpp add_person_python list_people_python
++	rm -f add_person_cpp list_people_cpp
+ 	rm -f protoc_middleman addressbook.pb.cc addressbook.pb.h addressbook_pb2.py
+ 	rm -f *.pyc
+ 	rm -f protoc_middleman_go tutorial/*.pb.go add_person_go list_people_go
+@@ -20,7 +19,7 @@ clean:
+ 	rmdir com 2>/dev/null || true
+ 
+ protoc_middleman: addressbook.proto
+-	protoc --cpp_out=. --python_out=. addressbook.proto
++	protoc --cpp_out=. addressbook.proto
+ 	@touch protoc_middleman
+ 
+ protoc_middleman_go: addressbook.proto
+@@ -48,14 +47,3 @@ list_people_go: list_people.go protoc_middleman_go
+ list_people_gotest: list_people.go list_people_go
+ 	go test list_people.go list_people_test.go
+ 
+-add_person_python: add_person.py protoc_middleman
+-	@echo "Writing shortcut script add_person_python..."
+-	@echo '#! /bin/sh' > add_person_python
+-	@echo './add_person.py "$$@"' >> add_person_python
+-	@chmod +x add_person_python
+-
+-list_people_python: list_people.py protoc_middleman
+-	@echo "Writing shortcut script list_people_python..."
+-	@echo '#! /bin/sh' > list_people_python
+-	@echo './list_people.py "$$@"' >> list_people_python
+-	@chmod +x list_people_python
+diff --git a/examples/add_person.py b/examples/add_person.py
+deleted file mode 100755
+index 0b69857..0000000
+--- a/examples/add_person.py
++++ /dev/null
+@@ -1,56 +0,0 @@
+-#! /usr/bin/env python
+-
+-# See README.txt for information and build instructions.
+-
+-import addressbook_pb2
+-import sys
+-
+-# This function fills in a Person message based on user input.
+-def PromptForAddress(person):
+-  person.id = int(raw_input("Enter person ID number: "))
+-  person.name = raw_input("Enter name: ")
+-
+-  email = raw_input("Enter email address (blank for none): ")
+-  if email != "":
+-    person.email = email
+-
+-  while True:
+-    number = raw_input("Enter a phone number (or leave blank to finish): ")
+-    if number == "":
+-      break
+-
+-    phone_number = person.phones.add()
+-    phone_number.number = number
+-
+-    type = raw_input("Is this a mobile, home, or work phone? ")
+-    if type == "mobile":
+-      phone_number.type = addressbook_pb2.Person.MOBILE
+-    elif type == "home":
+-      phone_number.type = addressbook_pb2.Person.HOME
+-    elif type == "work":
+-      phone_number.type = addressbook_pb2.Person.WORK
+-    else:
+-      print "Unknown phone type; leaving as default value."
+-
+-# Main procedure:  Reads the entire address book from a file,
+-#   adds one person based on user input, then writes it back out to the same
+-#   file.
+-if len(sys.argv) != 2:
+-  print "Usage:", sys.argv[0], "ADDRESS_BOOK_FILE"
+-  sys.exit(-1)
+-
+-address_book = addressbook_pb2.AddressBook()
+-
+-# Read the existing address book.
+-try:
+-  with open(sys.argv[1], "rb") as f:
+-    address_book.ParseFromString(f.read())
+-except IOError:
+-  print sys.argv[1] + ": File not found.  Creating a new file."
+-
+-# Add an address.
+-PromptForAddress(address_book.people.add())
+-
+-# Write the new address book back to disk.
+-with open(sys.argv[1], "wb") as f:
+-  f.write(address_book.SerializeToString())
+diff --git a/examples/list_people.py b/examples/list_people.py
+deleted file mode 100755
+index f131872..0000000
+--- a/examples/list_people.py
++++ /dev/null
+@@ -1,37 +0,0 @@
+-#! /usr/bin/env python
+-
+-# See README.txt for information and build instructions.
+-
+-import addressbook_pb2
+-import sys
+-
+-# Iterates though all people in the AddressBook and prints info about them.
+-def ListPeople(address_book):
+-  for person in address_book.people:
+-    print "Person ID:", person.id
+-    print "  Name:", person.name
+-    if person.email != "":
+-      print "  E-mail address:", person.email
+-
+-    for phone_number in person.phones:
+-      if phone_number.type == addressbook_pb2.Person.MOBILE:
+-        print "  Mobile phone #:",
+-      elif phone_number.type == addressbook_pb2.Person.HOME:
+-        print "  Home phone #:",
+-      elif phone_number.type == addressbook_pb2.Person.WORK:
+-        print "  Work phone #:",
+-      print phone_number.number
+-
+-# Main procedure:  Reads the entire address book from a file and prints all
+-#   the information inside.
+-if len(sys.argv) != 2:
+-  print "Usage:", sys.argv[0], "ADDRESS_BOOK_FILE"
+-  sys.exit(-1)
+-
+-address_book = addressbook_pb2.AddressBook()
+-
+-# Read the existing address book.
+-with open(sys.argv[1], "rb") as f:
+-  address_book.ParseFromString(f.read())
+-
+-ListPeople(address_book)
+diff --git a/src/Makefile.am b/src/Makefile.am
+index 863d794..2531b2a 100644
+--- a/src/Makefile.am
++++ b/src/Makefile.am
+@@ -157,7 +157,6 @@ nobase_include_HEADERS =                                        \
+   google/protobuf/compiler/cpp/cpp_generator.h                  \
+   google/protobuf/compiler/js/js_generator.h                    \
+   google/protobuf/compiler/php/php_generator.h                  \
+-  google/protobuf/compiler/python/python_generator.h            \
+   google/protobuf/compiler/ruby/ruby_generator.h                \
+   google/protobuf/util/type_resolver.h                          \
+   google/protobuf/util/field_comparator.h                       \
+@@ -333,7 +332,6 @@ libprotoc_la_SOURCES =                                         \
+   google/protobuf/compiler/cpp/cpp_string_field.h              \
+   google/protobuf/compiler/js/js_generator.cc                  \
+   google/protobuf/compiler/php/php_generator.cc                \
+-  google/protobuf/compiler/python/python_generator.cc          \
+   google/protobuf/compiler/ruby/ruby_generator.cc
+ 
+ bin_PROGRAMS = protoc
+@@ -613,7 +611,6 @@ protobuf_test_SOURCES =                                        \
+   google/protobuf/compiler/cpp/cpp_unittest.cc                 \
+   google/protobuf/compiler/cpp/cpp_plugin_unittest.cc          \
+   google/protobuf/compiler/cpp/metadata_test.cc                \
+-  google/protobuf/compiler/python/python_plugin_unittest.cc    \
+   google/protobuf/compiler/ruby/ruby_generator_unittest.cc     \
+   google/protobuf/util/field_comparator_test.cc                \
+   google/protobuf/util/field_mask_util_test.cc                 \
+diff --git a/src/Makefile.in b/src/Makefile.in
+index ffe3411..076f6fe 100644
+--- a/src/Makefile.in
++++ b/src/Makefile.in
+@@ -268,7 +268,6 @@ am_libprotoc_la_OBJECTS = google/protobuf/compiler/code_generator.lo \
+ 	google/protobuf/compiler/cpp/cpp_string_field.lo \
+ 	google/protobuf/compiler/js/js_generator.lo \
+ 	google/protobuf/compiler/php/php_generator.lo \
+-	google/protobuf/compiler/python/python_generator.lo \
+ 	google/protobuf/compiler/ruby/ruby_generator.lo
+ libprotoc_la_OBJECTS = $(am_libprotoc_la_OBJECTS)
+ libprotoc_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) \
+@@ -495,7 +494,6 @@ am_protobuf_test_OBJECTS = google/protobuf/stubs/protobuf_test-bytestream_unitte
+ 	google/protobuf/compiler/cpp/protobuf_test-cpp_unittest.$(OBJEXT) \
+ 	google/protobuf/compiler/cpp/protobuf_test-cpp_plugin_unittest.$(OBJEXT) \
+ 	google/protobuf/compiler/cpp/protobuf_test-metadata_test.$(OBJEXT) \
+-	google/protobuf/compiler/python/protobuf_test-python_plugin_unittest.$(OBJEXT) \
+ 	google/protobuf/compiler/ruby/protobuf_test-ruby_generator_unittest.$(OBJEXT) \
+ 	google/protobuf/util/protobuf_test-field_comparator_test.$(OBJEXT) \
+ 	google/protobuf/util/protobuf_test-field_mask_util_test.$(OBJEXT) \
+@@ -742,7 +740,6 @@ am__nobase_include_HEADERS_DIST =  \
+ 	google/protobuf/compiler/cpp/cpp_generator.h \
+ 	google/protobuf/compiler/js/js_generator.h \
+ 	google/protobuf/compiler/php/php_generator.h \
+-	google/protobuf/compiler/python/python_generator.h \
+ 	google/protobuf/compiler/ruby/ruby_generator.h \
+ 	google/protobuf/util/type_resolver.h \
+ 	google/protobuf/util/field_comparator.h \
+@@ -1225,7 +1222,6 @@ nobase_include_HEADERS = \
+   google/protobuf/compiler/cpp/cpp_generator.h                  \
+   google/protobuf/compiler/js/js_generator.h                    \
+   google/protobuf/compiler/php/php_generator.h                  \
+-  google/protobuf/compiler/python/python_generator.h            \
+   google/protobuf/compiler/ruby/ruby_generator.h                \
+   google/protobuf/util/type_resolver.h                          \
+   google/protobuf/util/field_comparator.h                       \
+@@ -1399,7 +1395,6 @@ libprotoc_la_SOURCES = \
+   google/protobuf/compiler/cpp/cpp_string_field.h              \
+   google/protobuf/compiler/js/js_generator.cc                  \
+   google/protobuf/compiler/php/php_generator.cc                \
+-  google/protobuf/compiler/python/python_generator.cc          \
+   google/protobuf/compiler/ruby/ruby_generator.cc
+ 
+ protoc_LDADD = $(PTHREAD_LIBS) libprotobuf.la libprotoc.la
+@@ -1656,7 +1651,6 @@ protobuf_test_SOURCES = \
+   google/protobuf/compiler/cpp/cpp_unittest.cc                 \
+   google/protobuf/compiler/cpp/cpp_plugin_unittest.cc          \
+   google/protobuf/compiler/cpp/metadata_test.cc                \
+-  google/protobuf/compiler/python/python_plugin_unittest.cc    \
+   google/protobuf/compiler/ruby/ruby_generator_unittest.cc     \
+   google/protobuf/util/field_comparator_test.cc                \
+   google/protobuf/util/field_mask_util_test.cc                 \
+@@ -2142,15 +2136,6 @@ google/protobuf/compiler/php/$(DEPDIR)/$(am__dirstamp):
+ google/protobuf/compiler/php/php_generator.lo:  \
+ 	google/protobuf/compiler/php/$(am__dirstamp) \
+ 	google/protobuf/compiler/php/$(DEPDIR)/$(am__dirstamp)
+-google/protobuf/compiler/python/$(am__dirstamp):
+-	@$(MKDIR_P) google/protobuf/compiler/python
+-	@: > google/protobuf/compiler/python/$(am__dirstamp)
+-google/protobuf/compiler/python/$(DEPDIR)/$(am__dirstamp):
+-	@$(MKDIR_P) google/protobuf/compiler/python/$(DEPDIR)
+-	@: > google/protobuf/compiler/python/$(DEPDIR)/$(am__dirstamp)
+-google/protobuf/compiler/python/python_generator.lo:  \
+-	google/protobuf/compiler/python/$(am__dirstamp) \
+-	google/protobuf/compiler/python/$(DEPDIR)/$(am__dirstamp)
+ google/protobuf/compiler/ruby/$(am__dirstamp):
+ 	@$(MKDIR_P) google/protobuf/compiler/ruby
+ 	@: > google/protobuf/compiler/ruby/$(am__dirstamp)
+@@ -2744,9 +2729,6 @@ google/protobuf/compiler/cpp/protobuf_test-cpp_plugin_unittest.$(OBJEXT):  \
+ google/protobuf/compiler/cpp/protobuf_test-metadata_test.$(OBJEXT):  \
+ 	google/protobuf/compiler/cpp/$(am__dirstamp) \
+ 	google/protobuf/compiler/cpp/$(DEPDIR)/$(am__dirstamp)
+-google/protobuf/compiler/python/protobuf_test-python_plugin_unittest.$(OBJEXT):  \
+-	google/protobuf/compiler/python/$(am__dirstamp) \
+-	google/protobuf/compiler/python/$(DEPDIR)/$(am__dirstamp)
+ google/protobuf/compiler/ruby/protobuf_test-ruby_generator_unittest.$(OBJEXT):  \
+ 	google/protobuf/compiler/ruby/$(am__dirstamp) \
+ 	google/protobuf/compiler/ruby/$(DEPDIR)/$(am__dirstamp)
+@@ -2990,8 +2972,6 @@ mostlyclean-compile:
+ 	-rm -f google/protobuf/compiler/js/*.lo
+ 	-rm -f google/protobuf/compiler/php/*.$(OBJEXT)
+ 	-rm -f google/protobuf/compiler/php/*.lo
+-	-rm -f google/protobuf/compiler/python/*.$(OBJEXT)
+-	-rm -f google/protobuf/compiler/python/*.lo
+ 	-rm -f google/protobuf/compiler/ruby/*.$(OBJEXT)
+ 	-rm -f google/protobuf/compiler/ruby/*.lo
+ 	-rm -f google/protobuf/io/*.$(OBJEXT)
+@@ -3222,8 +3202,6 @@ distclean-compile:
+ @AMDEP_TRUE@@am__include@ @am__quote@google/protobuf/compiler/cpp/$(DEPDIR)/protobuf_test-metadata_test.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@google/protobuf/compiler/js/$(DEPDIR)/js_generator.Plo@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@google/protobuf/compiler/php/$(DEPDIR)/php_generator.Plo@am__quote@
+-@AMDEP_TRUE@@am__include@ @am__quote@google/protobuf/compiler/python/$(DEPDIR)/protobuf_test-python_plugin_unittest.Po@am__quote@
+-@AMDEP_TRUE@@am__include@ @am__quote@google/protobuf/compiler/python/$(DEPDIR)/python_generator.Plo@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@google/protobuf/compiler/ruby/$(DEPDIR)/protobuf_test-ruby_generator_unittest.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@google/protobuf/compiler/ruby/$(DEPDIR)/ruby_generator.Plo@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@google/protobuf/io/$(DEPDIR)/coded_stream.Plo@am__quote@
+@@ -5693,20 +5671,6 @@ google/protobuf/compiler/cpp/protobuf_test-metadata_test.obj: google/protobuf/co
+ @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+ @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(protobuf_test_CPPFLAGS) $(CPPFLAGS) $(protobuf_test_CXXFLAGS) $(CXXFLAGS) -c -o google/protobuf/compiler/cpp/protobuf_test-metadata_test.obj `if test -f 'google/protobuf/compiler/cpp/metadata_test.cc'; then $(CYGPATH_W) 'google/protobuf/compiler/cpp/metadata_test.cc'; else $(CYGPATH_W) '$(srcdir)/google/protobuf/compiler/cpp/metadata_test.cc'; fi`
+ 
+-google/protobuf/compiler/python/protobuf_test-python_plugin_unittest.o: google/protobuf/compiler/python/python_plugin_unittest.cc
+-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(protobuf_test_CPPFLAGS) $(CPPFLAGS) $(protobuf_test_CXXFLAGS) $(CXXFLAGS) -MT google/protobuf/compiler/python/protobuf_test-python_plugin_unittest.o -MD -MP -MF google/protobuf/compiler/python/$(DEPDIR)/protobuf_test-python_plugin_unittest.Tpo -c -o google/protobuf/compiler/python/protobuf_test-python_plugin_unittest.o `test -f 'google/protobuf/compiler/python/python_plugin_unittest.cc' || echo '$(srcdir)/'`google/protobuf/compiler/python/python_plugin_unittest.cc
+-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) google/protobuf/compiler/python/$(DEPDIR)/protobuf_test-python_plugin_unittest.Tpo google/protobuf/compiler/python/$(DEPDIR)/protobuf_test-python_plugin_unittest.Po
+-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='google/protobuf/compiler/python/python_plugin_unittest.cc' object='google/protobuf/compiler/python/protobuf_test-python_plugin_unittest.o' libtool=no @AMDEPBACKSLASH@
+-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(protobuf_test_CPPFLAGS) $(CPPFLAGS) $(protobuf_test_CXXFLAGS) $(CXXFLAGS) -c -o google/protobuf/compiler/python/protobuf_test-python_plugin_unittest.o `test -f 'google/protobuf/compiler/python/python_plugin_unittest.cc' || echo '$(srcdir)/'`google/protobuf/compiler/python/python_plugin_unittest.cc
+-
+-google/protobuf/compiler/python/protobuf_test-python_plugin_unittest.obj: google/protobuf/compiler/python/python_plugin_unittest.cc
+-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(protobuf_test_CPPFLAGS) $(CPPFLAGS) $(protobuf_test_CXXFLAGS) $(CXXFLAGS) -MT google/protobuf/compiler/python/protobuf_test-python_plugin_unittest.obj -MD -MP -MF google/protobuf/compiler/python/$(DEPDIR)/protobuf_test-python_plugin_unittest.Tpo -c -o google/protobuf/compiler/python/protobuf_test-python_plugin_unittest.obj `if test -f 'google/protobuf/compiler/python/python_plugin_unittest.cc'; then $(CYGPATH_W) 'google/protobuf/compiler/python/python_plugin_unittest.cc'; else $(CYGPATH_W) '$(srcdir)/google/protobuf/compiler/python/python_plugin_unittest.cc'; fi`
+-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) google/protobuf/compiler/python/$(DEPDIR)/protobuf_test-python_plugin_unittest.Tpo google/protobuf/compiler/python/$(DEPDIR)/protobuf_test-python_plugin_unittest.Po
+-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='google/protobuf/compiler/python/python_plugin_unittest.cc' object='google/protobuf/compiler/python/protobuf_test-python_plugin_unittest.obj' libtool=no @AMDEPBACKSLASH@
+-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(protobuf_test_CPPFLAGS) $(CPPFLAGS) $(protobuf_test_CXXFLAGS) $(CXXFLAGS) -c -o google/protobuf/compiler/python/protobuf_test-python_plugin_unittest.obj `if test -f 'google/protobuf/compiler/python/python_plugin_unittest.cc'; then $(CYGPATH_W) 'google/protobuf/compiler/python/python_plugin_unittest.cc'; else $(CYGPATH_W) '$(srcdir)/google/protobuf/compiler/python/python_plugin_unittest.cc'; fi`
+-
+ google/protobuf/compiler/ruby/protobuf_test-ruby_generator_unittest.o: google/protobuf/compiler/ruby/ruby_generator_unittest.cc
+ @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(protobuf_test_CPPFLAGS) $(CPPFLAGS) $(protobuf_test_CXXFLAGS) $(CXXFLAGS) -MT google/protobuf/compiler/ruby/protobuf_test-ruby_generator_unittest.o -MD -MP -MF google/protobuf/compiler/ruby/$(DEPDIR)/protobuf_test-ruby_generator_unittest.Tpo -c -o google/protobuf/compiler/ruby/protobuf_test-ruby_generator_unittest.o `test -f 'google/protobuf/compiler/ruby/ruby_generator_unittest.cc' || echo '$(srcdir)/'`google/protobuf/compiler/ruby/ruby_generator_unittest.cc
+ @am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) google/protobuf/compiler/ruby/$(DEPDIR)/protobuf_test-ruby_generator_unittest.Tpo google/protobuf/compiler/ruby/$(DEPDIR)/protobuf_test-ruby_generator_unittest.Po
+@@ -6655,7 +6619,6 @@ clean-libtool:
+ 	-rm -rf google/protobuf/compiler/cpp/.libs google/protobuf/compiler/cpp/_libs
+ 	-rm -rf google/protobuf/compiler/js/.libs google/protobuf/compiler/js/_libs
+ 	-rm -rf google/protobuf/compiler/php/.libs google/protobuf/compiler/php/_libs
+-	-rm -rf google/protobuf/compiler/python/.libs google/protobuf/compiler/python/_libs
+ 	-rm -rf google/protobuf/compiler/ruby/.libs google/protobuf/compiler/ruby/_libs
+ 	-rm -rf google/protobuf/io/.libs google/protobuf/io/_libs
+ 	-rm -rf google/protobuf/stubs/.libs google/protobuf/stubs/_libs
+@@ -7050,8 +7013,6 @@ distclean-generic:
+ 	-rm -f google/protobuf/compiler/js/$(am__dirstamp)
+ 	-rm -f google/protobuf/compiler/php/$(DEPDIR)/$(am__dirstamp)
+ 	-rm -f google/protobuf/compiler/php/$(am__dirstamp)
+-	-rm -f google/protobuf/compiler/python/$(DEPDIR)/$(am__dirstamp)
+-	-rm -f google/protobuf/compiler/python/$(am__dirstamp)
+ 	-rm -f google/protobuf/compiler/ruby/$(DEPDIR)/$(am__dirstamp)
+ 	-rm -f google/protobuf/compiler/ruby/$(am__dirstamp)
+ 	-rm -f google/protobuf/io/$(DEPDIR)/$(am__dirstamp)
+@@ -7078,7 +7039,7 @@ clean-am: clean-binPROGRAMS clean-checkPROGRAMS clean-generic \
+ 	clean-libLTLIBRARIES clean-libtool clean-local mostlyclean-am
+ 
+ distclean: distclean-am
+-	-rm -rf ./$(DEPDIR) google/protobuf/$(DEPDIR) google/protobuf/compiler/$(DEPDIR) google/protobuf/compiler/cpp/$(DEPDIR) google/protobuf/compiler/js/$(DEPDIR) google/protobuf/compiler/php/$(DEPDIR) google/protobuf/compiler/python/$(DEPDIR) google/protobuf/compiler/ruby/$(DEPDIR) google/protobuf/io/$(DEPDIR) google/protobuf/stubs/$(DEPDIR) google/protobuf/testing/$(DEPDIR) google/protobuf/util/$(DEPDIR) google/protobuf/util/internal/$(DEPDIR) google/protobuf/util/internal/testdata/$(DEPDIR)
++	-rm -rf ./$(DEPDIR) google/protobuf/$(DEPDIR) google/protobuf/compiler/$(DEPDIR) google/protobuf/compiler/cpp/$(DEPDIR) google/protobuf/compiler/js/$(DEPDIR) google/protobuf/compiler/php/$(DEPDIR) google/protobuf/compiler/ruby/$(DEPDIR) google/protobuf/io/$(DEPDIR) google/protobuf/stubs/$(DEPDIR) google/protobuf/testing/$(DEPDIR) google/protobuf/util/$(DEPDIR) google/protobuf/util/internal/$(DEPDIR) google/protobuf/util/internal/testdata/$(DEPDIR)
+ 	-rm -f Makefile
+ distclean-am: clean-am distclean-compile distclean-generic \
+ 	distclean-tags
+@@ -7125,7 +7086,7 @@ install-ps-am:
+ installcheck-am:
+ 
+ maintainer-clean: maintainer-clean-am
+-	-rm -rf ./$(DEPDIR) google/protobuf/$(DEPDIR) google/protobuf/compiler/$(DEPDIR) google/protobuf/compiler/cpp/$(DEPDIR) google/protobuf/compiler/js/$(DEPDIR) google/protobuf/compiler/php/$(DEPDIR) google/protobuf/compiler/python/$(DEPDIR) google/protobuf/compiler/ruby/$(DEPDIR) google/protobuf/io/$(DEPDIR) google/protobuf/stubs/$(DEPDIR) google/protobuf/testing/$(DEPDIR) google/protobuf/util/$(DEPDIR) google/protobuf/util/internal/$(DEPDIR) google/protobuf/util/internal/testdata/$(DEPDIR)
++	-rm -rf ./$(DEPDIR) google/protobuf/$(DEPDIR) google/protobuf/compiler/$(DEPDIR) google/protobuf/compiler/cpp/$(DEPDIR) google/protobuf/compiler/js/$(DEPDIR) google/protobuf/compiler/php/$(DEPDIR) google/protobuf/compiler/ruby/$(DEPDIR) google/protobuf/io/$(DEPDIR) google/protobuf/stubs/$(DEPDIR) google/protobuf/testing/$(DEPDIR) google/protobuf/util/$(DEPDIR) google/protobuf/util/internal/$(DEPDIR) google/protobuf/util/internal/testdata/$(DEPDIR)
+ 	-rm -f Makefile
+ maintainer-clean-am: distclean-am maintainer-clean-generic
+ 
+diff --git a/src/google/protobuf/compiler/python/python_generator.cc b/src/google/protobuf/compiler/python/python_generator.cc
+deleted file mode 100644
+index 3b1b0d1..0000000
+--- a/src/google/protobuf/compiler/python/python_generator.cc
++++ /dev/null
+@@ -1,1393 +0,0 @@
+-// Protocol Buffers - Google's data interchange format
+-// Copyright 2008 Google Inc.  All rights reserved.
+-// https://developers.google.com/protocol-buffers/
+-//
+-// Redistribution and use in source and binary forms, with or without
+-// modification, are permitted provided that the following conditions are
+-// met:
+-//
+-//     * Redistributions of source code must retain the above copyright
+-// notice, this list of conditions and the following disclaimer.
+-//     * Redistributions in binary form must reproduce the above
+-// copyright notice, this list of conditions and the following disclaimer
+-// in the documentation and/or other materials provided with the
+-// distribution.
+-//     * Neither the name of Google Inc. nor the names of its
+-// contributors may be used to endorse or promote products derived from
+-// this software without specific prior written permission.
+-//
+-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+-
+-//#PY25 compatible generated code for GAE.
+-// Copyright 2007 Google Inc. All Rights Reserved.
+-// Author: robinson@google.com (Will Robinson)
+-//
+-// This module outputs pure-Python protocol message classes that will
+-// largely be constructed at runtime via the metaclass in reflection.py.
+-// In other words, our job is basically to output a Python equivalent
+-// of the C++ *Descriptor objects, and fix up all circular references
+-// within these objects.
+-//
+-// Note that the runtime performance of protocol message classes created in
+-// this way is expected to be lousy.  The plan is to create an alternate
+-// generator that outputs a Python/C extension module that lets
+-// performance-minded Python code leverage the fast C++ implementation
+-// directly.
+-
+-#include <algorithm>
+-#include <google/protobuf/stubs/hash.h>
+-#include <limits>
+-#include <map>
+-#include <memory>
+-#ifndef _SHARED_PTR_H
+-#include <google/protobuf/stubs/shared_ptr.h>
+-#endif
+-#include <string>
+-#include <utility>
+-#include <vector>
+-
+-#include <google/protobuf/compiler/python/python_generator.h>
+-#include <google/protobuf/descriptor.pb.h>
+-
+-#include <google/protobuf/stubs/logging.h>
+-#include <google/protobuf/stubs/common.h>
+-#include <google/protobuf/stubs/stringprintf.h>
+-#include <google/protobuf/io/printer.h>
+-#include <google/protobuf/descriptor.h>
+-#include <google/protobuf/io/zero_copy_stream.h>
+-#include <google/protobuf/stubs/strutil.h>
+-#include <google/protobuf/stubs/substitute.h>
+-
+-namespace google {
+-namespace protobuf {
+-namespace compiler {
+-namespace python {
+-
+-namespace {
+-
+-// Returns a copy of |filename| with any trailing ".protodevel" or ".proto
+-// suffix stripped.
+-// TODO(robinson): Unify with copy in compiler/cpp/internal/helpers.cc.
+-string StripProto(const string& filename) {
+-  const char* suffix = HasSuffixString(filename, ".protodevel")
+-      ? ".protodevel" : ".proto";
+-  return StripSuffixString(filename, suffix);
+-}
+-
+-
+-// Returns the Python module name expected for a given .proto filename.
+-string ModuleName(const string& filename) {
+-  string basename = StripProto(filename);
+-  ReplaceCharacters(&basename, "-", '_');
+-  ReplaceCharacters(&basename, "/", '.');
+-  return basename + "_pb2";
+-}
+-
+-
+-// Returns the alias we assign to the module of the given .proto filename
+-// when importing. See testPackageInitializationImport in
+-// google/protobuf/python/reflection_test.py
+-// to see why we need the alias.
+-string ModuleAlias(const string& filename) {
+-  string module_name = ModuleName(filename);
+-  // We can't have dots in the module name, so we replace each with _dot_.
+-  // But that could lead to a collision between a.b and a_dot_b, so we also
+-  // duplicate each underscore.
+-  GlobalReplaceSubstring("_", "__", &module_name);
+-  GlobalReplaceSubstring(".", "_dot_", &module_name);
+-  return module_name;
+-}
+-
+-// Keywords reserved by the Python language.
+-const char* const kKeywords[] = {
+-    "False",   "None",     "True",     "and",    "as",    "assert", "break",
+-    "class",   "continue", "def",      "del",    "elif",  "else",   "except",
+-    "finally", "for",      "from",     "global", "if",    "import", "in",
+-    "is",      "lambda",   "nonlocal", "not",    "or",    "pass",   "raise",
+-    "return",  "try",      "while",    "with",   "yield",
+-};
+-const char* const* kKeywordsEnd =
+-    kKeywords + (sizeof(kKeywords) / sizeof(kKeywords[0]));
+-
+-bool ContainsPythonKeyword(const string& module_name) {
+-  vector<string> tokens = Split(module_name, ".");
+-  for (int i = 0; i < tokens.size(); ++i) {
+-    if (std::find(kKeywords, kKeywordsEnd, tokens[i]) != kKeywordsEnd) {
+-      return true;
+-    }
+-  }
+-  return false;
+-}
+-
+-
+-// Returns the name of all containing types for descriptor,
+-// in order from outermost to innermost, followed by descriptor's
+-// own name.  Each name is separated by |separator|.
+-template <typename DescriptorT>
+-string NamePrefixedWithNestedTypes(const DescriptorT& descriptor,
+-                                   const string& separator) {
+-  string name = descriptor.name();
+-  for (const Descriptor* current = descriptor.containing_type();
+-       current != NULL; current = current->containing_type()) {
+-    name = current->name() + separator + name;
+-  }
+-  return name;
+-}
+-
+-
+-// Name of the class attribute where we store the Python
+-// descriptor.Descriptor instance for the generated class.
+-// Must stay consistent with the _DESCRIPTOR_KEY constant
+-// in proto2/public/reflection.py.
+-const char kDescriptorKey[] = "DESCRIPTOR";
+-
+-
+-// Does the file have top-level enums?
+-inline bool HasTopLevelEnums(const FileDescriptor *file) {
+-  return file->enum_type_count() > 0;
+-}
+-
+-
+-// Should we generate generic services for this file?
+-inline bool HasGenericServices(const FileDescriptor *file) {
+-  return file->service_count() > 0 &&
+-         file->options().py_generic_services();
+-}
+-
+-
+-// Prints the common boilerplate needed at the top of every .py
+-// file output by this generator.
+-void PrintTopBoilerplate(
+-    io::Printer* printer, const FileDescriptor* file, bool descriptor_proto) {
+-  // TODO(robinson): Allow parameterization of Python version?
+-  printer->Print(
+-      "# Generated by the protocol buffer compiler.  DO NOT EDIT!\n"
+-      "# source: $filename$\n"
+-      "\nimport sys\n_b=sys.version_info[0]<3 and (lambda x:x) or (lambda x:x.encode('latin1'))"  //##PY25
+-      "\n",
+-      "filename", file->name());
+-  if (HasTopLevelEnums(file)) {
+-    printer->Print(
+-        "from google.protobuf.internal import enum_type_wrapper\n");
+-  }
+-  printer->Print(
+-      "from google.protobuf import descriptor as _descriptor\n"
+-      "from google.protobuf import message as _message\n"
+-      "from google.protobuf import reflection as _reflection\n"
+-      "from google.protobuf import symbol_database as "
+-      "_symbol_database\n");
+-  if (HasGenericServices(file)) {
+-    printer->Print(
+-        "from google.protobuf import service as _service\n"
+-        "from google.protobuf import service_reflection\n");
+-  }
+-
+-  // Avoid circular imports if this module is descriptor_pb2.
+-  if (!descriptor_proto) {
+-    printer->Print(
+-        "from google.protobuf import descriptor_pb2\n");
+-  }
+-  printer->Print(
+-      "# @@protoc_insertion_point(imports)\n\n"
+-      "_sym_db = _symbol_database.Default()\n");
+-  printer->Print("\n\n");
+-}
+-
+-
+-// Returns a Python literal giving the default value for a field.
+-// If the field specifies no explicit default value, we'll return
+-// the default default value for the field type (zero for numbers,
+-// empty string for strings, empty list for repeated fields, and
+-// None for non-repeated, composite fields).
+-//
+-// TODO(robinson): Unify with code from
+-// //compiler/cpp/internal/primitive_field.cc
+-// //compiler/cpp/internal/enum_field.cc
+-// //compiler/cpp/internal/string_field.cc
+-string StringifyDefaultValue(const FieldDescriptor& field) {
+-  if (field.is_repeated()) {
+-    return "[]";
+-  }
+-
+-  switch (field.cpp_type()) {
+-    case FieldDescriptor::CPPTYPE_INT32:
+-      return SimpleItoa(field.default_value_int32());
+-    case FieldDescriptor::CPPTYPE_UINT32:
+-      return SimpleItoa(field.default_value_uint32());
+-    case FieldDescriptor::CPPTYPE_INT64:
+-      return SimpleItoa(field.default_value_int64());
+-    case FieldDescriptor::CPPTYPE_UINT64:
+-      return SimpleItoa(field.default_value_uint64());
+-    case FieldDescriptor::CPPTYPE_DOUBLE: {
+-      double value = field.default_value_double();
+-      if (value == numeric_limits<double>::infinity()) {
+-        // Python pre-2.6 on Windows does not parse "inf" correctly.  However,
+-        // a numeric literal that is too big for a double will become infinity.
+-        return "1e10000";
+-      } else if (value == -numeric_limits<double>::infinity()) {
+-        // See above.
+-        return "-1e10000";
+-      } else if (value != value) {
+-        // infinity * 0 = nan
+-        return "(1e10000 * 0)";
+-      } else {
+-        return "float(" + SimpleDtoa(value) + ")";
+-      }
+-    }
+-    case FieldDescriptor::CPPTYPE_FLOAT: {
+-      float value = field.default_value_float();
+-      if (value == numeric_limits<float>::infinity()) {
+-        // Python pre-2.6 on Windows does not parse "inf" correctly.  However,
+-        // a numeric literal that is too big for a double will become infinity.
+-        return "1e10000";
+-      } else if (value == -numeric_limits<float>::infinity()) {
+-        // See above.
+-        return "-1e10000";
+-      } else if (value != value) {
+-        // infinity - infinity = nan
+-        return "(1e10000 * 0)";
+-      } else {
+-        return "float(" + SimpleFtoa(value) + ")";
+-      }
+-    }
+-    case FieldDescriptor::CPPTYPE_BOOL:
+-      return field.default_value_bool() ? "True" : "False";
+-    case FieldDescriptor::CPPTYPE_ENUM:
+-      return SimpleItoa(field.default_value_enum()->number());
+-    case FieldDescriptor::CPPTYPE_STRING:
+-//##!PY25      return "b\"" + CEscape(field.default_value_string()) +
+-//##!PY25             (field.type() != FieldDescriptor::TYPE_STRING ? "\"" :
+-//##!PY25               "\".decode('utf-8')");
+-      return "_b(\"" + CEscape(field.default_value_string()) +  //##PY25
+-             (field.type() != FieldDescriptor::TYPE_STRING ? "\")" :  //##PY25
+-               "\").decode('utf-8')");  //##PY25
+-    case FieldDescriptor::CPPTYPE_MESSAGE:
+-      return "None";
+-  }
+-  // (We could add a default case above but then we wouldn't get the nice
+-  // compiler warning when a new type is added.)
+-  GOOGLE_LOG(FATAL) << "Not reached.";
+-  return "";
+-}
+-
+-string StringifySyntax(FileDescriptor::Syntax syntax) {
+-  switch (syntax) {
+-    case FileDescriptor::SYNTAX_PROTO2:
+-      return "proto2";
+-    case FileDescriptor::SYNTAX_PROTO3:
+-      return "proto3";
+-    case FileDescriptor::SYNTAX_UNKNOWN:
+-    default:
+-      GOOGLE_LOG(FATAL) << "Unsupported syntax; this generator only supports proto2 "
+-                    "and proto3 syntax.";
+-      return "";
+-  }
+-}
+-
+-
+-}  // namespace
+-
+-
+-Generator::Generator() : file_(NULL) {
+-}
+-
+-Generator::~Generator() {
+-}
+-
+-bool Generator::Generate(const FileDescriptor* file,
+-                         const string& parameter,
+-                         GeneratorContext* context,
+-                         string* error) const {
+-
+-  // Completely serialize all Generate() calls on this instance.  The
+-  // thread-safety constraints of the CodeGenerator interface aren't clear so
+-  // just be as conservative as possible.  It's easier to relax this later if
+-  // we need to, but I doubt it will be an issue.
+-  // TODO(kenton):  The proper thing to do would be to allocate any state on
+-  //   the stack and use that, so that the Generator class itself does not need
+-  //   to have any mutable members.  Then it is implicitly thread-safe.
+-  MutexLock lock(&mutex_);
+-  file_ = file;
+-  string module_name = ModuleName(file->name());
+-  string filename = module_name;
+-  ReplaceCharacters(&filename, ".", '/');
+-  filename += ".py";
+-
+-  FileDescriptorProto fdp;
+-  file_->CopyTo(&fdp);
+-  fdp.SerializeToString(&file_descriptor_serialized_);
+-
+-
+-  google::protobuf::scoped_ptr<io::ZeroCopyOutputStream> output(context->Open(filename));
+-  GOOGLE_CHECK(output.get());
+-  io::Printer printer(output.get(), '$');
+-  printer_ = &printer;
+-
+-  PrintTopBoilerplate(printer_, file_, GeneratingDescriptorProto());
+-  PrintImports();
+-  PrintFileDescriptor();
+-  PrintTopLevelEnums();
+-  PrintTopLevelExtensions();
+-  PrintAllNestedEnumsInFile();
+-  PrintMessageDescriptors();
+-  FixForeignFieldsInDescriptors();
+-  PrintMessages();
+-  // We have to fix up the extensions after the message classes themselves,
+-  // since they need to call static RegisterExtension() methods on these
+-  // classes.
+-  FixForeignFieldsInExtensions();
+-  // Descriptor options may have custom extensions. These custom options
+-  // can only be successfully parsed after we register corresponding
+-  // extensions. Therefore we parse all options again here to recognize
+-  // custom options that may be unknown when we define the descriptors.
+-  FixAllDescriptorOptions();
+-  if (HasGenericServices(file)) {
+-    PrintServices();
+-  }
+-
+-  printer.Print(
+-    "# @@protoc_insertion_point(module_scope)\n");
+-
+-  return !printer.failed();
+-}
+-
+-// Prints Python imports for all modules imported by |file|.
+-void Generator::PrintImports() const {
+-  for (int i = 0; i < file_->dependency_count(); ++i) {
+-    const string& filename = file_->dependency(i)->name();
+-
+-    string module_name = ModuleName(filename);
+-    string module_alias = ModuleAlias(filename);
+-    if (ContainsPythonKeyword(module_name)) {
+-      // If the module path contains a Python keyword, we have to quote the
+-      // module name and import it using importlib. Otherwise the usual kind of
+-      // import statement would result in a syntax error from the presence of
+-      // the keyword.
+-      printer_->Print("import importlib\n");
+-      printer_->Print("$alias$ = importlib.import_module('$name$')\n", "alias",
+-                      module_alias, "name", module_name);
+-    } else {
+-      int last_dot_pos = module_name.rfind('.');
+-      string import_statement;
+-      if (last_dot_pos == string::npos) {
+-        // NOTE(petya): this is not tested as it would require a protocol buffer
+-        // outside of any package, and I don't think that is easily achievable.
+-        import_statement = "import " + module_name;
+-      } else {
+-        import_statement = "from " + module_name.substr(0, last_dot_pos) +
+-                           " import " + module_name.substr(last_dot_pos + 1);
+-      }
+-      printer_->Print("$statement$ as $alias$\n", "statement", import_statement,
+-                      "alias", module_alias);
+-    }
+-
+-    CopyPublicDependenciesAliases(module_alias, file_->dependency(i));
+-  }
+-  printer_->Print("\n");
+-
+-  // Print public imports.
+-  for (int i = 0; i < file_->public_dependency_count(); ++i) {
+-    string module_name = ModuleName(file_->public_dependency(i)->name());
+-    printer_->Print("from $module$ import *\n", "module", module_name);
+-  }
+-  printer_->Print("\n");
+-}
+-
+-// Prints the single file descriptor for this file.
+-void Generator::PrintFileDescriptor() const {
+-  map<string, string> m;
+-  m["descriptor_name"] = kDescriptorKey;
+-  m["name"] = file_->name();
+-  m["package"] = file_->package();
+-  m["syntax"] = StringifySyntax(file_->syntax());
+-  const char file_descriptor_template[] =
+-      "$descriptor_name$ = _descriptor.FileDescriptor(\n"
+-      "  name='$name$',\n"
+-      "  package='$package$',\n"
+-      "  syntax='$syntax$',\n";
+-  printer_->Print(m, file_descriptor_template);
+-  printer_->Indent();
+-  printer_->Print(
+-//##!PY25      "serialized_pb=b'$value$'\n",
+-      "serialized_pb=_b('$value$')\n",  //##PY25
+-      "value", strings::CHexEscape(file_descriptor_serialized_));
+-  if (file_->dependency_count() != 0) {
+-    printer_->Print(",\ndependencies=[");
+-    for (int i = 0; i < file_->dependency_count(); ++i) {
+-      string module_alias = ModuleAlias(file_->dependency(i)->name());
+-      printer_->Print("$module_alias$.DESCRIPTOR,", "module_alias",
+-                      module_alias);
+-    }
+-    printer_->Print("]");
+-  }
+-  if (file_->public_dependency_count() > 0) {
+-    printer_->Print(",\npublic_dependencies=[");
+-    for (int i = 0; i < file_->public_dependency_count(); ++i) {
+-      string module_alias = ModuleAlias(file_->public_dependency(i)->name());
+-      printer_->Print("$module_alias$.DESCRIPTOR,", "module_alias",
+-                      module_alias);
+-    }
+-    printer_->Print("]");
+-  }
+-
+-  // TODO(falk): Also print options and fix the message_type, enum_type,
+-  //             service and extension later in the generation.
+-
+-  printer_->Outdent();
+-  printer_->Print(")\n");
+-  printer_->Print("_sym_db.RegisterFileDescriptor($name$)\n", "name",
+-                  kDescriptorKey);
+-  printer_->Print("\n");
+-}
+-
+-// Prints descriptors and module-level constants for all top-level
+-// enums defined in |file|.
+-void Generator::PrintTopLevelEnums() const {
+-  vector<pair<string, int> > top_level_enum_values;
+-  for (int i = 0; i < file_->enum_type_count(); ++i) {
+-    const EnumDescriptor& enum_descriptor = *file_->enum_type(i);
+-    PrintEnum(enum_descriptor);
+-    printer_->Print("$name$ = "
+-                    "enum_type_wrapper.EnumTypeWrapper($descriptor_name$)",
+-                    "name", enum_descriptor.name(),
+-                    "descriptor_name",
+-                    ModuleLevelDescriptorName(enum_descriptor));
+-    printer_->Print("\n");
+-
+-    for (int j = 0; j < enum_descriptor.value_count(); ++j) {
+-      const EnumValueDescriptor& value_descriptor = *enum_descriptor.value(j);
+-      top_level_enum_values.push_back(
+-          std::make_pair(value_descriptor.name(), value_descriptor.number()));
+-    }
+-  }
+-
+-  for (int i = 0; i < top_level_enum_values.size(); ++i) {
+-    printer_->Print("$name$ = $value$\n",
+-                    "name", top_level_enum_values[i].first,
+-                    "value", SimpleItoa(top_level_enum_values[i].second));
+-  }
+-  printer_->Print("\n");
+-}
+-
+-// Prints all enums contained in all message types in |file|.
+-void Generator::PrintAllNestedEnumsInFile() const {
+-  for (int i = 0; i < file_->message_type_count(); ++i) {
+-    PrintNestedEnums(*file_->message_type(i));
+-  }
+-}
+-
+-// Prints a Python statement assigning the appropriate module-level
+-// enum name to a Python EnumDescriptor object equivalent to
+-// enum_descriptor.
+-void Generator::PrintEnum(const EnumDescriptor& enum_descriptor) const {
+-  map<string, string> m;
+-  string module_level_descriptor_name =
+-      ModuleLevelDescriptorName(enum_descriptor);
+-  m["descriptor_name"] = module_level_descriptor_name;
+-  m["name"] = enum_descriptor.name();
+-  m["full_name"] = enum_descriptor.full_name();
+-  m["file"] = kDescriptorKey;
+-  const char enum_descriptor_template[] =
+-      "$descriptor_name$ = _descriptor.EnumDescriptor(\n"
+-      "  name='$name$',\n"
+-      "  full_name='$full_name$',\n"
+-      "  filename=None,\n"
+-      "  file=$file$,\n"
+-      "  values=[\n";
+-  string options_string;
+-  enum_descriptor.options().SerializeToString(&options_string);
+-  printer_->Print(m, enum_descriptor_template);
+-  printer_->Indent();
+-  printer_->Indent();
+-  for (int i = 0; i < enum_descriptor.value_count(); ++i) {
+-    PrintEnumValueDescriptor(*enum_descriptor.value(i));
+-    printer_->Print(",\n");
+-  }
+-  printer_->Outdent();
+-  printer_->Print("],\n");
+-  printer_->Print("containing_type=None,\n");
+-  printer_->Print("options=$options_value$,\n",
+-                  "options_value",
+-                  OptionsValue("EnumOptions", options_string));
+-  EnumDescriptorProto edp;
+-  PrintSerializedPbInterval(enum_descriptor, edp);
+-  printer_->Outdent();
+-  printer_->Print(")\n");
+-  printer_->Print("_sym_db.RegisterEnumDescriptor($name$)\n", "name",
+-                  module_level_descriptor_name);
+-  printer_->Print("\n");
+-}
+-
+-// Recursively prints enums in nested types within descriptor, then
+-// prints enums contained at the top level in descriptor.
+-void Generator::PrintNestedEnums(const Descriptor& descriptor) const {
+-  for (int i = 0; i < descriptor.nested_type_count(); ++i) {
+-    PrintNestedEnums(*descriptor.nested_type(i));
+-  }
+-
+-  for (int i = 0; i < descriptor.enum_type_count(); ++i) {
+-    PrintEnum(*descriptor.enum_type(i));
+-  }
+-}
+-
+-void Generator::PrintTopLevelExtensions() const {
+-  const bool is_extension = true;
+-  for (int i = 0; i < file_->extension_count(); ++i) {
+-    const FieldDescriptor& extension_field = *file_->extension(i);
+-    string constant_name = extension_field.name() + "_FIELD_NUMBER";
+-    UpperString(&constant_name);
+-    printer_->Print("$constant_name$ = $number$\n",
+-      "constant_name", constant_name,
+-      "number", SimpleItoa(extension_field.number()));
+-    printer_->Print("$name$ = ", "name", extension_field.name());
+-    PrintFieldDescriptor(extension_field, is_extension);
+-    printer_->Print("\n");
+-  }
+-  printer_->Print("\n");
+-}
+-
+-// Prints Python equivalents of all Descriptors in |file|.
+-void Generator::PrintMessageDescriptors() const {
+-  for (int i = 0; i < file_->message_type_count(); ++i) {
+-    PrintDescriptor(*file_->message_type(i));
+-    printer_->Print("\n");
+-  }
+-}
+-
+-void Generator::PrintServices() const {
+-  for (int i = 0; i < file_->service_count(); ++i) {
+-    PrintServiceDescriptor(*file_->service(i));
+-    PrintServiceClass(*file_->service(i));
+-    PrintServiceStub(*file_->service(i));
+-    printer_->Print("\n");
+-  }
+-}
+-
+-void Generator::PrintServiceDescriptor(
+-    const ServiceDescriptor& descriptor) const {
+-  printer_->Print("\n");
+-  string service_name = ModuleLevelServiceDescriptorName(descriptor);
+-  string options_string;
+-  descriptor.options().SerializeToString(&options_string);
+-
+-  printer_->Print(
+-      "$service_name$ = _descriptor.ServiceDescriptor(\n",
+-      "service_name", service_name);
+-  printer_->Indent();
+-  map<string, string> m;
+-  m["name"] = descriptor.name();
+-  m["full_name"] = descriptor.full_name();
+-  m["file"] = kDescriptorKey;
+-  m["index"] = SimpleItoa(descriptor.index());
+-  m["options_value"] = OptionsValue("ServiceOptions", options_string);
+-  const char required_function_arguments[] =
+-      "name='$name$',\n"
+-      "full_name='$full_name$',\n"
+-      "file=$file$,\n"
+-      "index=$index$,\n"
+-      "options=$options_value$,\n";
+-  printer_->Print(m, required_function_arguments);
+-
+-  ServiceDescriptorProto sdp;
+-  PrintSerializedPbInterval(descriptor, sdp);
+-
+-  printer_->Print("methods=[\n");
+-  for (int i = 0; i < descriptor.method_count(); ++i) {
+-    const MethodDescriptor* method = descriptor.method(i);
+-    method->options().SerializeToString(&options_string);
+-
+-    m.clear();
+-    m["name"] = method->name();
+-    m["full_name"] = method->full_name();
+-    m["index"] = SimpleItoa(method->index());
+-    m["serialized_options"] = CEscape(options_string);
+-    m["input_type"] = ModuleLevelDescriptorName(*(method->input_type()));
+-    m["output_type"] = ModuleLevelDescriptorName(*(method->output_type()));
+-    m["options_value"] = OptionsValue("MethodOptions", options_string);
+-    printer_->Print("_descriptor.MethodDescriptor(\n");
+-    printer_->Indent();
+-    printer_->Print(
+-        m,
+-        "name='$name$',\n"
+-        "full_name='$full_name$',\n"
+-        "index=$index$,\n"
+-        "containing_service=None,\n"
+-        "input_type=$input_type$,\n"
+-        "output_type=$output_type$,\n"
+-        "options=$options_value$,\n");
+-    printer_->Outdent();
+-    printer_->Print("),\n");
+-  }
+-
+-  printer_->Outdent();
+-  printer_->Print("])\n\n");
+-}
+-
+-
+-void Generator::PrintDescriptorKeyAndModuleName(
+-    const ServiceDescriptor& descriptor) const {
+-  printer_->Print(
+-      "$descriptor_key$ = $descriptor_name$,\n",
+-      "descriptor_key", kDescriptorKey,
+-      "descriptor_name", ModuleLevelServiceDescriptorName(descriptor));
+-  printer_->Print(
+-      "__module__ = '$module_name$'\n",
+-      "module_name", ModuleName(file_->name()));
+-}
+-
+-void Generator::PrintServiceClass(const ServiceDescriptor& descriptor) const {
+-  // Print the service.
+-  printer_->Print("$class_name$ = service_reflection.GeneratedServiceType("
+-                  "'$class_name$', (_service.Service,), dict(\n",
+-                  "class_name", descriptor.name());
+-  printer_->Indent();
+-  Generator::PrintDescriptorKeyAndModuleName(descriptor);
+-  printer_->Print("))\n\n");
+-  printer_->Outdent();
+-}
+-
+-void Generator::PrintServiceStub(const ServiceDescriptor& descriptor) const {
+-  // Print the service stub.
+-  printer_->Print("$class_name$_Stub = "
+-                  "service_reflection.GeneratedServiceStubType("
+-                  "'$class_name$_Stub', ($class_name$,), dict(\n",
+-                  "class_name", descriptor.name());
+-  printer_->Indent();
+-  Generator::PrintDescriptorKeyAndModuleName(descriptor);
+-  printer_->Print("))\n\n");
+-  printer_->Outdent();
+-}
+-
+-// Prints statement assigning ModuleLevelDescriptorName(message_descriptor)
+-// to a Python Descriptor object for message_descriptor.
+-//
+-// Mutually recursive with PrintNestedDescriptors().
+-void Generator::PrintDescriptor(const Descriptor& message_descriptor) const {
+-  PrintNestedDescriptors(message_descriptor);
+-
+-  printer_->Print("\n");
+-  printer_->Print("$descriptor_name$ = _descriptor.Descriptor(\n",
+-                  "descriptor_name",
+-                  ModuleLevelDescriptorName(message_descriptor));
+-  printer_->Indent();
+-  map<string, string> m;
+-  m["name"] = message_descriptor.name();
+-  m["full_name"] = message_descriptor.full_name();
+-  m["file"] = kDescriptorKey;
+-  const char required_function_arguments[] =
+-      "name='$name$',\n"
+-      "full_name='$full_name$',\n"
+-      "filename=None,\n"
+-      "file=$file$,\n"
+-      "containing_type=None,\n";
+-  printer_->Print(m, required_function_arguments);
+-  PrintFieldsInDescriptor(message_descriptor);
+-  PrintExtensionsInDescriptor(message_descriptor);
+-
+-  // Nested types
+-  printer_->Print("nested_types=[");
+-  for (int i = 0; i < message_descriptor.nested_type_count(); ++i) {
+-    const string nested_name = ModuleLevelDescriptorName(
+-        *message_descriptor.nested_type(i));
+-    printer_->Print("$name$, ", "name", nested_name);
+-  }
+-  printer_->Print("],\n");
+-
+-  // Enum types
+-  printer_->Print("enum_types=[\n");
+-  printer_->Indent();
+-  for (int i = 0; i < message_descriptor.enum_type_count(); ++i) {
+-    const string descriptor_name = ModuleLevelDescriptorName(
+-        *message_descriptor.enum_type(i));
+-    printer_->Print(descriptor_name.c_str());
+-    printer_->Print(",\n");
+-  }
+-  printer_->Outdent();
+-  printer_->Print("],\n");
+-  string options_string;
+-  message_descriptor.options().SerializeToString(&options_string);
+-  printer_->Print(
+-      "options=$options_value$,\n"
+-      "is_extendable=$extendable$,\n"
+-      "syntax='$syntax$'",
+-      "options_value", OptionsValue("MessageOptions", options_string),
+-      "extendable", message_descriptor.extension_range_count() > 0 ?
+-                      "True" : "False",
+-      "syntax", StringifySyntax(message_descriptor.file()->syntax()));
+-  printer_->Print(",\n");
+-
+-  // Extension ranges
+-  printer_->Print("extension_ranges=[");
+-  for (int i = 0; i < message_descriptor.extension_range_count(); ++i) {
+-    const Descriptor::ExtensionRange* range =
+-        message_descriptor.extension_range(i);
+-    printer_->Print("($start$, $end$), ",
+-                    "start", SimpleItoa(range->start),
+-                    "end", SimpleItoa(range->end));
+-  }
+-  printer_->Print("],\n");
+-  printer_->Print("oneofs=[\n");
+-  printer_->Indent();
+-  for (int i = 0; i < message_descriptor.oneof_decl_count(); ++i) {
+-    const OneofDescriptor* desc = message_descriptor.oneof_decl(i);
+-    map<string, string> m;
+-    m["name"] = desc->name();
+-    m["full_name"] = desc->full_name();
+-    m["index"] = SimpleItoa(desc->index());
+-    string options_string =
+-        OptionsValue("OneofOptions", desc->options().SerializeAsString());
+-    if (options_string == "None") {
+-      m["options"] = "";
+-    } else {
+-      m["options"] = ", options=" + options_string;
+-    }
+-    printer_->Print(
+-        m,
+-        "_descriptor.OneofDescriptor(\n"
+-        "  name='$name$', full_name='$full_name$',\n"
+-        "  index=$index$, containing_type=None, fields=[]$options$),\n");
+-  }
+-  printer_->Outdent();
+-  printer_->Print("],\n");
+-  // Serialization of proto
+-  DescriptorProto edp;
+-  PrintSerializedPbInterval(message_descriptor, edp);
+-
+-  printer_->Outdent();
+-  printer_->Print(")\n");
+-}
+-
+-// Prints Python Descriptor objects for all nested types contained in
+-// message_descriptor.
+-//
+-// Mutually recursive with PrintDescriptor().
+-void Generator::PrintNestedDescriptors(
+-    const Descriptor& containing_descriptor) const {
+-  for (int i = 0; i < containing_descriptor.nested_type_count(); ++i) {
+-    PrintDescriptor(*containing_descriptor.nested_type(i));
+-  }
+-}
+-
+-// Prints all messages in |file|.
+-void Generator::PrintMessages() const {
+-  for (int i = 0; i < file_->message_type_count(); ++i) {
+-    vector<string> to_register;
+-    PrintMessage(*file_->message_type(i), "", &to_register);
+-    for (int j = 0; j < to_register.size(); ++j) {
+-      printer_->Print("_sym_db.RegisterMessage($name$)\n", "name",
+-                      to_register[j]);
+-    }
+-    printer_->Print("\n");
+-  }
+-}
+-
+-// Prints a Python class for the given message descriptor.  We defer to the
+-// metaclass to do almost all of the work of actually creating a useful class.
+-// The purpose of this function and its many helper functions above is merely
+-// to output a Python version of the descriptors, which the metaclass in
+-// reflection.py will use to construct the meat of the class itself.
+-//
+-// Mutually recursive with PrintNestedMessages().
+-// Collect nested message names to_register for the symbol_database.
+-void Generator::PrintMessage(const Descriptor& message_descriptor,
+-                             const string& prefix,
+-                             vector<string>* to_register) const {
+-  string qualified_name(prefix + message_descriptor.name());
+-  to_register->push_back(qualified_name);
+-  printer_->Print(
+-      "$name$ = _reflection.GeneratedProtocolMessageType('$name$', "
+-      "(_message.Message,), dict(\n",
+-      "name", message_descriptor.name());
+-  printer_->Indent();
+-
+-  PrintNestedMessages(message_descriptor, qualified_name + ".", to_register);
+-  map<string, string> m;
+-  m["descriptor_key"] = kDescriptorKey;
+-  m["descriptor_name"] = ModuleLevelDescriptorName(message_descriptor);
+-  printer_->Print(m, "$descriptor_key$ = $descriptor_name$,\n");
+-  printer_->Print("__module__ = '$module_name$'\n",
+-                  "module_name", ModuleName(file_->name()));
+-  printer_->Print("# @@protoc_insertion_point(class_scope:$full_name$)\n",
+-                  "full_name", message_descriptor.full_name());
+-  printer_->Print("))\n");
+-  printer_->Outdent();
+-}
+-
+-// Prints all nested messages within |containing_descriptor|.
+-// Mutually recursive with PrintMessage().
+-void Generator::PrintNestedMessages(const Descriptor& containing_descriptor,
+-                                    const string& prefix,
+-                                    vector<string>* to_register) const {
+-  for (int i = 0; i < containing_descriptor.nested_type_count(); ++i) {
+-    printer_->Print("\n");
+-    PrintMessage(*containing_descriptor.nested_type(i), prefix, to_register);
+-    printer_->Print(",\n");
+-  }
+-}
+-
+-// Recursively fixes foreign fields in all nested types in |descriptor|, then
+-// sets the message_type and enum_type of all message and enum fields to point
+-// to their respective descriptors.
+-// Args:
+-//   descriptor: descriptor to print fields for.
+-//   containing_descriptor: if descriptor is a nested type, this is its
+-//       containing type, or NULL if this is a root/top-level type.
+-void Generator::FixForeignFieldsInDescriptor(
+-    const Descriptor& descriptor,
+-    const Descriptor* containing_descriptor) const {
+-  for (int i = 0; i < descriptor.nested_type_count(); ++i) {
+-    FixForeignFieldsInDescriptor(*descriptor.nested_type(i), &descriptor);
+-  }
+-
+-  for (int i = 0; i < descriptor.field_count(); ++i) {
+-    const FieldDescriptor& field_descriptor = *descriptor.field(i);
+-    FixForeignFieldsInField(&descriptor, field_descriptor, "fields_by_name");
+-  }
+-
+-  FixContainingTypeInDescriptor(descriptor, containing_descriptor);
+-  for (int i = 0; i < descriptor.enum_type_count(); ++i) {
+-    const EnumDescriptor& enum_descriptor = *descriptor.enum_type(i);
+-    FixContainingTypeInDescriptor(enum_descriptor, &descriptor);
+-  }
+-  for (int i = 0; i < descriptor.oneof_decl_count(); ++i) {
+-    map<string, string> m;
+-    const OneofDescriptor* oneof = descriptor.oneof_decl(i);
+-    m["descriptor_name"] = ModuleLevelDescriptorName(descriptor);
+-    m["oneof_name"] = oneof->name();
+-    for (int j = 0; j < oneof->field_count(); ++j) {
+-      m["field_name"] = oneof->field(j)->name();
+-      printer_->Print(
+-          m,
+-          "$descriptor_name$.oneofs_by_name['$oneof_name$'].fields.append(\n"
+-          "  $descriptor_name$.fields_by_name['$field_name$'])\n");
+-      printer_->Print(
+-          m,
+-          "$descriptor_name$.fields_by_name['$field_name$'].containing_oneof = "
+-          "$descriptor_name$.oneofs_by_name['$oneof_name$']\n");
+-    }
+-  }
+-}
+-
+-void Generator::AddMessageToFileDescriptor(const Descriptor& descriptor) const {
+-  map<string, string> m;
+-  m["descriptor_name"] = kDescriptorKey;
+-  m["message_name"] = descriptor.name();
+-  m["message_descriptor_name"] = ModuleLevelDescriptorName(descriptor);
+-  const char file_descriptor_template[] =
+-      "$descriptor_name$.message_types_by_name['$message_name$'] = "
+-      "$message_descriptor_name$\n";
+-  printer_->Print(m, file_descriptor_template);
+-}
+-
+-void Generator::AddEnumToFileDescriptor(
+-    const EnumDescriptor& descriptor) const {
+-  map<string, string> m;
+-  m["descriptor_name"] = kDescriptorKey;
+-  m["enum_name"] = descriptor.name();
+-  m["enum_descriptor_name"] = ModuleLevelDescriptorName(descriptor);
+-  const char file_descriptor_template[] =
+-      "$descriptor_name$.enum_types_by_name['$enum_name$'] = "
+-      "$enum_descriptor_name$\n";
+-  printer_->Print(m, file_descriptor_template);
+-}
+-
+-void Generator::AddExtensionToFileDescriptor(
+-    const FieldDescriptor& descriptor) const {
+-  map<string, string> m;
+-  m["descriptor_name"] = kDescriptorKey;
+-  m["field_name"] = descriptor.name();
+-  const char file_descriptor_template[] =
+-      "$descriptor_name$.extensions_by_name['$field_name$'] = "
+-      "$field_name$\n";
+-  printer_->Print(m, file_descriptor_template);
+-}
+-
+-// Sets any necessary message_type and enum_type attributes
+-// for the Python version of |field|.
+-//
+-// containing_type may be NULL, in which case this is a module-level field.
+-//
+-// python_dict_name is the name of the Python dict where we should
+-// look the field up in the containing type.  (e.g., fields_by_name
+-// or extensions_by_name).  We ignore python_dict_name if containing_type
+-// is NULL.
+-void Generator::FixForeignFieldsInField(const Descriptor* containing_type,
+-                                        const FieldDescriptor& field,
+-                                        const string& python_dict_name) const {
+-  const string field_referencing_expression = FieldReferencingExpression(
+-      containing_type, field, python_dict_name);
+-  map<string, string> m;
+-  m["field_ref"] = field_referencing_expression;
+-  const Descriptor* foreign_message_type = field.message_type();
+-  if (foreign_message_type) {
+-    m["foreign_type"] = ModuleLevelDescriptorName(*foreign_message_type);
+-    printer_->Print(m, "$field_ref$.message_type = $foreign_type$\n");
+-  }
+-  const EnumDescriptor* enum_type = field.enum_type();
+-  if (enum_type) {
+-    m["enum_type"] = ModuleLevelDescriptorName(*enum_type);
+-    printer_->Print(m, "$field_ref$.enum_type = $enum_type$\n");
+-  }
+-}
+-
+-// Returns the module-level expression for the given FieldDescriptor.
+-// Only works for fields in the .proto file this Generator is generating for.
+-//
+-// containing_type may be NULL, in which case this is a module-level field.
+-//
+-// python_dict_name is the name of the Python dict where we should
+-// look the field up in the containing type.  (e.g., fields_by_name
+-// or extensions_by_name).  We ignore python_dict_name if containing_type
+-// is NULL.
+-string Generator::FieldReferencingExpression(
+-    const Descriptor* containing_type,
+-    const FieldDescriptor& field,
+-    const string& python_dict_name) const {
+-  // We should only ever be looking up fields in the current file.
+-  // The only things we refer to from other files are message descriptors.
+-  GOOGLE_CHECK_EQ(field.file(), file_) << field.file()->name() << " vs. "
+-                                << file_->name();
+-  if (!containing_type) {
+-    return field.name();
+-  }
+-  return strings::Substitute(
+-      "$0.$1['$2']",
+-      ModuleLevelDescriptorName(*containing_type),
+-      python_dict_name, field.name());
+-}
+-
+-// Prints containing_type for nested descriptors or enum descriptors.
+-template <typename DescriptorT>
+-void Generator::FixContainingTypeInDescriptor(
+-    const DescriptorT& descriptor,
+-    const Descriptor* containing_descriptor) const {
+-  if (containing_descriptor != NULL) {
+-    const string nested_name = ModuleLevelDescriptorName(descriptor);
+-    const string parent_name = ModuleLevelDescriptorName(
+-        *containing_descriptor);
+-    printer_->Print(
+-        "$nested_name$.containing_type = $parent_name$\n",
+-        "nested_name", nested_name,
+-        "parent_name", parent_name);
+-  }
+-}
+-
+-// Prints statements setting the message_type and enum_type fields in the
+-// Python descriptor objects we've already output in ths file.  We must
+-// do this in a separate step due to circular references (otherwise, we'd
+-// just set everything in the initial assignment statements).
+-void Generator::FixForeignFieldsInDescriptors() const {
+-  for (int i = 0; i < file_->message_type_count(); ++i) {
+-    FixForeignFieldsInDescriptor(*file_->message_type(i), NULL);
+-  }
+-  for (int i = 0; i < file_->message_type_count(); ++i) {
+-    AddMessageToFileDescriptor(*file_->message_type(i));
+-  }
+-  for (int i = 0; i < file_->enum_type_count(); ++i) {
+-    AddEnumToFileDescriptor(*file_->enum_type(i));
+-  }
+-  for (int i = 0; i < file_->extension_count(); ++i) {
+-    AddExtensionToFileDescriptor(*file_->extension(i));
+-  }
+-  printer_->Print("\n");
+-}
+-
+-// We need to not only set any necessary message_type fields, but
+-// also need to call RegisterExtension() on each message we're
+-// extending.
+-void Generator::FixForeignFieldsInExtensions() const {
+-  // Top-level extensions.
+-  for (int i = 0; i < file_->extension_count(); ++i) {
+-    FixForeignFieldsInExtension(*file_->extension(i));
+-  }
+-  // Nested extensions.
+-  for (int i = 0; i < file_->message_type_count(); ++i) {
+-    FixForeignFieldsInNestedExtensions(*file_->message_type(i));
+-  }
+-  printer_->Print("\n");
+-}
+-
+-void Generator::FixForeignFieldsInExtension(
+-    const FieldDescriptor& extension_field) const {
+-  GOOGLE_CHECK(extension_field.is_extension());
+-  // extension_scope() will be NULL for top-level extensions, which is
+-  // exactly what FixForeignFieldsInField() wants.
+-  FixForeignFieldsInField(extension_field.extension_scope(), extension_field,
+-                          "extensions_by_name");
+-
+-  map<string, string> m;
+-  // Confusingly, for FieldDescriptors that happen to be extensions,
+-  // containing_type() means "extended type."
+-  // On the other hand, extension_scope() will give us what we normally
+-  // mean by containing_type().
+-  m["extended_message_class"] = ModuleLevelMessageName(
+-      *extension_field.containing_type());
+-  m["field"] = FieldReferencingExpression(extension_field.extension_scope(),
+-                                          extension_field,
+-                                          "extensions_by_name");
+-  printer_->Print(m, "$extended_message_class$.RegisterExtension($field$)\n");
+-}
+-
+-void Generator::FixForeignFieldsInNestedExtensions(
+-    const Descriptor& descriptor) const {
+-  // Recursively fix up extensions in all nested types.
+-  for (int i = 0; i < descriptor.nested_type_count(); ++i) {
+-    FixForeignFieldsInNestedExtensions(*descriptor.nested_type(i));
+-  }
+-  // Fix up extensions directly contained within this type.
+-  for (int i = 0; i < descriptor.extension_count(); ++i) {
+-    FixForeignFieldsInExtension(*descriptor.extension(i));
+-  }
+-}
+-
+-// Returns a Python expression that instantiates a Python EnumValueDescriptor
+-// object for the given C++ descriptor.
+-void Generator::PrintEnumValueDescriptor(
+-    const EnumValueDescriptor& descriptor) const {
+-  // TODO(robinson): Fix up EnumValueDescriptor "type" fields.
+-  // More circular references.  ::sigh::
+-  string options_string;
+-  descriptor.options().SerializeToString(&options_string);
+-  map<string, string> m;
+-  m["name"] = descriptor.name();
+-  m["index"] = SimpleItoa(descriptor.index());
+-  m["number"] = SimpleItoa(descriptor.number());
+-  m["options"] = OptionsValue("EnumValueOptions", options_string);
+-  printer_->Print(
+-      m,
+-      "_descriptor.EnumValueDescriptor(\n"
+-      "  name='$name$', index=$index$, number=$number$,\n"
+-      "  options=$options$,\n"
+-      "  type=None)");
+-}
+-
+-// Returns a Python expression that calls descriptor._ParseOptions using
+-// the given descriptor class name and serialized options protobuf string.
+-string Generator::OptionsValue(
+-    const string& class_name, const string& serialized_options) const {
+-  if (serialized_options.length() == 0 || GeneratingDescriptorProto()) {
+-    return "None";
+-  } else {
+-    string full_class_name = "descriptor_pb2." + class_name;
+-//##!PY25    return "_descriptor._ParseOptions(" + full_class_name + "(), b'"
+-//##!PY25        + CEscape(serialized_options)+ "')";
+-    return "_descriptor._ParseOptions(" + full_class_name + "(), _b('"  //##PY25
+-        + CEscape(serialized_options)+ "'))";  //##PY25
+-  }
+-}
+-
+-// Prints an expression for a Python FieldDescriptor for |field|.
+-void Generator::PrintFieldDescriptor(
+-    const FieldDescriptor& field, bool is_extension) const {
+-  string options_string;
+-  field.options().SerializeToString(&options_string);
+-  map<string, string> m;
+-  m["name"] = field.name();
+-  m["full_name"] = field.full_name();
+-  m["index"] = SimpleItoa(field.index());
+-  m["number"] = SimpleItoa(field.number());
+-  m["type"] = SimpleItoa(field.type());
+-  m["cpp_type"] = SimpleItoa(field.cpp_type());
+-  m["label"] = SimpleItoa(field.label());
+-  m["has_default_value"] = field.has_default_value() ? "True" : "False";
+-  m["default_value"] = StringifyDefaultValue(field);
+-  m["is_extension"] = is_extension ? "True" : "False";
+-  m["options"] = OptionsValue("FieldOptions", options_string);
+-  m["json_name"] = field.has_json_name() ?
+-      ", json_name='" + field.json_name() + "'": "";
+-  // We always set message_type and enum_type to None at this point, and then
+-  // these fields in correctly after all referenced descriptors have been
+-  // defined and/or imported (see FixForeignFieldsInDescriptors()).
+-  const char field_descriptor_decl[] =
+-    "_descriptor.FieldDescriptor(\n"
+-    "  name='$name$', full_name='$full_name$', index=$index$,\n"
+-    "  number=$number$, type=$type$, cpp_type=$cpp_type$, label=$label$,\n"
+-    "  has_default_value=$has_default_value$, default_value=$default_value$,\n"
+-    "  message_type=None, enum_type=None, containing_type=None,\n"
+-    "  is_extension=$is_extension$, extension_scope=None,\n"
+-    "  options=$options$$json_name$)";
+-  printer_->Print(m, field_descriptor_decl);
+-}
+-
+-// Helper for Print{Fields,Extensions}InDescriptor().
+-void Generator::PrintFieldDescriptorsInDescriptor(
+-    const Descriptor& message_descriptor,
+-    bool is_extension,
+-    const string& list_variable_name,
+-    int (Descriptor::*CountFn)() const,
+-    const FieldDescriptor* (Descriptor::*GetterFn)(int) const) const {
+-  printer_->Print("$list$=[\n", "list", list_variable_name);
+-  printer_->Indent();
+-  for (int i = 0; i < (message_descriptor.*CountFn)(); ++i) {
+-    PrintFieldDescriptor(*(message_descriptor.*GetterFn)(i),
+-                         is_extension);
+-    printer_->Print(",\n");
+-  }
+-  printer_->Outdent();
+-  printer_->Print("],\n");
+-}
+-
+-// Prints a statement assigning "fields" to a list of Python FieldDescriptors,
+-// one for each field present in message_descriptor.
+-void Generator::PrintFieldsInDescriptor(
+-    const Descriptor& message_descriptor) const {
+-  const bool is_extension = false;
+-  PrintFieldDescriptorsInDescriptor(
+-      message_descriptor, is_extension, "fields",
+-      &Descriptor::field_count, &Descriptor::field);
+-}
+-
+-// Prints a statement assigning "extensions" to a list of Python
+-// FieldDescriptors, one for each extension present in message_descriptor.
+-void Generator::PrintExtensionsInDescriptor(
+-    const Descriptor& message_descriptor) const {
+-  const bool is_extension = true;
+-  PrintFieldDescriptorsInDescriptor(
+-      message_descriptor, is_extension, "extensions",
+-      &Descriptor::extension_count, &Descriptor::extension);
+-}
+-
+-bool Generator::GeneratingDescriptorProto() const {
+-  return file_->name() == "google/protobuf/descriptor.proto";
+-}
+-
+-// Returns the unique Python module-level identifier given to a descriptor.
+-// This name is module-qualified iff the given descriptor describes an
+-// entity that doesn't come from the current file.
+-template <typename DescriptorT>
+-string Generator::ModuleLevelDescriptorName(
+-    const DescriptorT& descriptor) const {
+-  // FIXME(robinson):
+-  // We currently don't worry about collisions with underscores in the type
+-  // names, so these would collide in nasty ways if found in the same file:
+-  //   OuterProto.ProtoA.ProtoB
+-  //   OuterProto_ProtoA.ProtoB  # Underscore instead of period.
+-  // As would these:
+-  //   OuterProto.ProtoA_.ProtoB
+-  //   OuterProto.ProtoA._ProtoB  # Leading vs. trailing underscore.
+-  // (Contrived, but certainly possible).
+-  //
+-  // The C++ implementation doesn't guard against this either.  Leaving
+-  // it for now...
+-  string name = NamePrefixedWithNestedTypes(descriptor, "_");
+-  UpperString(&name);
+-  // Module-private for now.  Easy to make public later; almost impossible
+-  // to make private later.
+-  name = "_" + name;
+-  // We now have the name relative to its own module.  Also qualify with
+-  // the module name iff this descriptor is from a different .proto file.
+-  if (descriptor.file() != file_) {
+-    name = ModuleAlias(descriptor.file()->name()) + "." + name;
+-  }
+-  return name;
+-}
+-
+-// Returns the name of the message class itself, not the descriptor.
+-// Like ModuleLevelDescriptorName(), module-qualifies the name iff
+-// the given descriptor describes an entity that doesn't come from
+-// the current file.
+-string Generator::ModuleLevelMessageName(const Descriptor& descriptor) const {
+-  string name = NamePrefixedWithNestedTypes(descriptor, ".");
+-  if (descriptor.file() != file_) {
+-    name = ModuleAlias(descriptor.file()->name()) + "." + name;
+-  }
+-  return name;
+-}
+-
+-// Returns the unique Python module-level identifier given to a service
+-// descriptor.
+-string Generator::ModuleLevelServiceDescriptorName(
+-    const ServiceDescriptor& descriptor) const {
+-  string name = descriptor.name();
+-  UpperString(&name);
+-  name = "_" + name;
+-  if (descriptor.file() != file_) {
+-    name = ModuleAlias(descriptor.file()->name()) + "." + name;
+-  }
+-  return name;
+-}
+-
+-// Prints standard constructor arguments serialized_start and serialized_end.
+-// Args:
+-//   descriptor: The cpp descriptor to have a serialized reference.
+-//   proto: A proto
+-// Example printer output:
+-// serialized_start=41,
+-// serialized_end=43,
+-//
+-template <typename DescriptorT, typename DescriptorProtoT>
+-void Generator::PrintSerializedPbInterval(
+-    const DescriptorT& descriptor, DescriptorProtoT& proto) const {
+-  descriptor.CopyTo(&proto);
+-  string sp;
+-  proto.SerializeToString(&sp);
+-  int offset = file_descriptor_serialized_.find(sp);
+-  GOOGLE_CHECK_GE(offset, 0);
+-
+-  printer_->Print("serialized_start=$serialized_start$,\n"
+-                  "serialized_end=$serialized_end$,\n",
+-                  "serialized_start", SimpleItoa(offset),
+-                  "serialized_end", SimpleItoa(offset + sp.size()));
+-}
+-
+-namespace {
+-void PrintDescriptorOptionsFixingCode(const string& descriptor,
+-                                      const string& options,
+-                                      io::Printer* printer) {
+-  // TODO(xiaofeng): I have added a method _SetOptions() to DescriptorBase
+-  // in proto2 python runtime but it couldn't be used here because appengine
+-  // uses a snapshot version of the library in which the new method is not
+-  // yet present. After appengine has synced their runtime library, the code
+-  // below should be cleaned up to use _SetOptions().
+-  printer->Print(
+-      "$descriptor$.has_options = True\n"
+-      "$descriptor$._options = $options$\n",
+-      "descriptor", descriptor, "options", options);
+-}
+-}  // namespace
+-
+-// Prints expressions that set the options field of all descriptors.
+-void Generator::FixAllDescriptorOptions() const {
+-  // Prints an expression that sets the file descriptor's options.
+-  string file_options = OptionsValue(
+-      "FileOptions", file_->options().SerializeAsString());
+-  if (file_options != "None") {
+-    PrintDescriptorOptionsFixingCode(kDescriptorKey, file_options, printer_);
+-  }
+-  // Prints expressions that set the options for all top level enums.
+-  for (int i = 0; i < file_->enum_type_count(); ++i) {
+-    const EnumDescriptor& enum_descriptor = *file_->enum_type(i);
+-    FixOptionsForEnum(enum_descriptor);
+-  }
+-  // Prints expressions that set the options for all top level extensions.
+-  for (int i = 0; i < file_->extension_count(); ++i) {
+-    const FieldDescriptor& field = *file_->extension(i);
+-    FixOptionsForField(field);
+-  }
+-  // Prints expressions that set the options for all messages, nested enums,
+-  // nested extensions and message fields.
+-  for (int i = 0; i < file_->message_type_count(); ++i) {
+-    FixOptionsForMessage(*file_->message_type(i));
+-  }
+-}
+-
+-void Generator::FixOptionsForOneof(const OneofDescriptor& oneof) const {
+-  string oneof_options = OptionsValue(
+-      "OneofOptions", oneof.options().SerializeAsString());
+-  if (oneof_options != "None") {
+-    string oneof_name = strings::Substitute(
+-        "$0.$1['$2']",
+-        ModuleLevelDescriptorName(*oneof.containing_type()),
+-        "oneofs_by_name", oneof.name());
+-    PrintDescriptorOptionsFixingCode(oneof_name, oneof_options, printer_);
+-  }
+-}
+-
+-// Prints expressions that set the options for an enum descriptor and its
+-// value descriptors.
+-void Generator::FixOptionsForEnum(const EnumDescriptor& enum_descriptor) const {
+-  string descriptor_name = ModuleLevelDescriptorName(enum_descriptor);
+-  string enum_options = OptionsValue(
+-      "EnumOptions", enum_descriptor.options().SerializeAsString());
+-  if (enum_options != "None") {
+-    PrintDescriptorOptionsFixingCode(descriptor_name, enum_options, printer_);
+-  }
+-  for (int i = 0; i < enum_descriptor.value_count(); ++i) {
+-    const EnumValueDescriptor& value_descriptor = *enum_descriptor.value(i);
+-    string value_options = OptionsValue(
+-        "EnumValueOptions", value_descriptor.options().SerializeAsString());
+-    if (value_options != "None") {
+-      PrintDescriptorOptionsFixingCode(
+-          StringPrintf("%s.values_by_name[\"%s\"]", descriptor_name.c_str(),
+-                       value_descriptor.name().c_str()),
+-          value_options, printer_);
+-    }
+-  }
+-}
+-
+-// Prints expressions that set the options for field descriptors (including
+-// extensions).
+-void Generator::FixOptionsForField(
+-    const FieldDescriptor& field) const {
+-  string field_options = OptionsValue(
+-      "FieldOptions", field.options().SerializeAsString());
+-  if (field_options != "None") {
+-    string field_name;
+-    if (field.is_extension()) {
+-      if (field.extension_scope() == NULL) {
+-        // Top level extensions.
+-        field_name = field.name();
+-      } else {
+-        field_name = FieldReferencingExpression(
+-            field.extension_scope(), field, "extensions_by_name");
+-      }
+-    } else {
+-      field_name = FieldReferencingExpression(
+-          field.containing_type(), field, "fields_by_name");
+-    }
+-    PrintDescriptorOptionsFixingCode(field_name, field_options, printer_);
+-  }
+-}
+-
+-// Prints expressions that set the options for a message and all its inner
+-// types (nested messages, nested enums, extensions, fields).
+-void Generator::FixOptionsForMessage(const Descriptor& descriptor) const {
+-  // Nested messages.
+-  for (int i = 0; i < descriptor.nested_type_count(); ++i) {
+-    FixOptionsForMessage(*descriptor.nested_type(i));
+-  }
+-  // Oneofs.
+-  for (int i = 0; i < descriptor.oneof_decl_count(); ++i) {
+-    FixOptionsForOneof(*descriptor.oneof_decl(i));
+-  }
+-  // Enums.
+-  for (int i = 0; i < descriptor.enum_type_count(); ++i) {
+-    FixOptionsForEnum(*descriptor.enum_type(i));
+-  }
+-  // Fields.
+-  for (int i = 0; i < descriptor.field_count(); ++i) {
+-    const FieldDescriptor& field = *descriptor.field(i);
+-    FixOptionsForField(field);
+-  }
+-  // Extensions.
+-  for (int i = 0; i < descriptor.extension_count(); ++i) {
+-    const FieldDescriptor& field = *descriptor.extension(i);
+-    FixOptionsForField(field);
+-  }
+-  // Message option for this message.
+-  string message_options = OptionsValue(
+-      "MessageOptions", descriptor.options().SerializeAsString());
+-  if (message_options != "None") {
+-    string descriptor_name = ModuleLevelDescriptorName(descriptor);
+-    PrintDescriptorOptionsFixingCode(descriptor_name,
+-                                     message_options,
+-                                     printer_);
+-  }
+-}
+-
+-// If a dependency forwards other files through public dependencies, let's
+-// copy over the corresponding module aliases.
+-void Generator::CopyPublicDependenciesAliases(
+-    const string& copy_from, const FileDescriptor* file) const {
+-  for (int i = 0; i < file->public_dependency_count(); ++i) {
+-    string module_alias = ModuleAlias(file->public_dependency(i)->name());
+-    printer_->Print("$alias$ = $copy_from$.$alias$\n", "alias", module_alias,
+-                    "copy_from", copy_from);
+-    CopyPublicDependenciesAliases(copy_from, file->public_dependency(i));
+-  }
+-}
+-
+-}  // namespace python
+-}  // namespace compiler
+-}  // namespace protobuf
+-}  // namespace google
+diff --git a/src/google/protobuf/compiler/python/python_generator.h b/src/google/protobuf/compiler/python/python_generator.h
+deleted file mode 100644
+index 7583aa6..0000000
+--- a/src/google/protobuf/compiler/python/python_generator.h
++++ /dev/null
+@@ -1,174 +0,0 @@
+-// Protocol Buffers - Google's data interchange format
+-// Copyright 2008 Google Inc.  All rights reserved.
+-// https://developers.google.com/protocol-buffers/
+-//
+-// Redistribution and use in source and binary forms, with or without
+-// modification, are permitted provided that the following conditions are
+-// met:
+-//
+-//     * Redistributions of source code must retain the above copyright
+-// notice, this list of conditions and the following disclaimer.
+-//     * Redistributions in binary form must reproduce the above
+-// copyright notice, this list of conditions and the following disclaimer
+-// in the documentation and/or other materials provided with the
+-// distribution.
+-//     * Neither the name of Google Inc. nor the names of its
+-// contributors may be used to endorse or promote products derived from
+-// this software without specific prior written permission.
+-//
+-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+-
+-// Author: robinson@google.com (Will Robinson)
+-//
+-// Generates Python code for a given .proto file.
+-
+-#ifndef GOOGLE_PROTOBUF_COMPILER_PYTHON_GENERATOR_H__
+-#define GOOGLE_PROTOBUF_COMPILER_PYTHON_GENERATOR_H__
+-
+-#include <string>
+-
+-#include <google/protobuf/compiler/code_generator.h>
+-#include <google/protobuf/stubs/mutex.h>
+-#include <google/protobuf/stubs/common.h>
+-
+-namespace google {
+-namespace protobuf {
+-
+-class Descriptor;
+-class EnumDescriptor;
+-class EnumValueDescriptor;
+-class FieldDescriptor;
+-class OneofDescriptor;
+-class ServiceDescriptor;
+-
+-namespace io { class Printer; }
+-
+-namespace compiler {
+-namespace python {
+-
+-// CodeGenerator implementation for generated Python protocol buffer classes.
+-// If you create your own protocol compiler binary and you want it to support
+-// Python output, you can do so by registering an instance of this
+-// CodeGenerator with the CommandLineInterface in your main() function.
+-class LIBPROTOC_EXPORT Generator : public CodeGenerator {
+- public:
+-  Generator();
+-  virtual ~Generator();
+-
+-  // CodeGenerator methods.
+-  virtual bool Generate(const FileDescriptor* file,
+-                        const string& parameter,
+-                        GeneratorContext* generator_context,
+-                        string* error) const;
+-
+- private:
+-  void PrintImports() const;
+-  void PrintFileDescriptor() const;
+-  void PrintTopLevelEnums() const;
+-  void PrintAllNestedEnumsInFile() const;
+-  void PrintNestedEnums(const Descriptor& descriptor) const;
+-  void PrintEnum(const EnumDescriptor& enum_descriptor) const;
+-
+-  void PrintTopLevelExtensions() const;
+-
+-  void PrintFieldDescriptor(
+-      const FieldDescriptor& field, bool is_extension) const;
+-  void PrintFieldDescriptorsInDescriptor(
+-      const Descriptor& message_descriptor,
+-      bool is_extension,
+-      const string& list_variable_name,
+-      int (Descriptor::*CountFn)() const,
+-      const FieldDescriptor* (Descriptor::*GetterFn)(int) const) const;
+-  void PrintFieldsInDescriptor(const Descriptor& message_descriptor) const;
+-  void PrintExtensionsInDescriptor(const Descriptor& message_descriptor) const;
+-  void PrintMessageDescriptors() const;
+-  void PrintDescriptor(const Descriptor& message_descriptor) const;
+-  void PrintNestedDescriptors(const Descriptor& containing_descriptor) const;
+-
+-  void PrintMessages() const;
+-  void PrintMessage(const Descriptor& message_descriptor, const string& prefix,
+-                    vector<string>* to_register) const;
+-  void PrintNestedMessages(const Descriptor& containing_descriptor,
+-                           const string& prefix,
+-                           vector<string>* to_register) const;
+-
+-  void FixForeignFieldsInDescriptors() const;
+-  void FixForeignFieldsInDescriptor(
+-      const Descriptor& descriptor,
+-      const Descriptor* containing_descriptor) const;
+-  void FixForeignFieldsInField(const Descriptor* containing_type,
+-                               const FieldDescriptor& field,
+-                               const string& python_dict_name) const;
+-  void AddMessageToFileDescriptor(const Descriptor& descriptor) const;
+-  void AddEnumToFileDescriptor(const EnumDescriptor& descriptor) const;
+-  void AddExtensionToFileDescriptor(const FieldDescriptor& descriptor) const;
+-  string FieldReferencingExpression(const Descriptor* containing_type,
+-                                    const FieldDescriptor& field,
+-                                    const string& python_dict_name) const;
+-  template <typename DescriptorT>
+-  void FixContainingTypeInDescriptor(
+-      const DescriptorT& descriptor,
+-      const Descriptor* containing_descriptor) const;
+-
+-  void FixForeignFieldsInExtensions() const;
+-  void FixForeignFieldsInExtension(
+-      const FieldDescriptor& extension_field) const;
+-  void FixForeignFieldsInNestedExtensions(const Descriptor& descriptor) const;
+-
+-  void PrintServices() const;
+-  void PrintServiceDescriptor(const ServiceDescriptor& descriptor) const;
+-  void PrintServiceClass(const ServiceDescriptor& descriptor) const;
+-  void PrintServiceStub(const ServiceDescriptor& descriptor) const;
+-  void PrintDescriptorKeyAndModuleName(
+-      const ServiceDescriptor& descriptor) const ;
+-
+-  void PrintEnumValueDescriptor(const EnumValueDescriptor& descriptor) const;
+-  string OptionsValue(const string& class_name,
+-                      const string& serialized_options) const;
+-  bool GeneratingDescriptorProto() const;
+-
+-  template <typename DescriptorT>
+-  string ModuleLevelDescriptorName(const DescriptorT& descriptor) const;
+-  string ModuleLevelMessageName(const Descriptor& descriptor) const;
+-  string ModuleLevelServiceDescriptorName(
+-      const ServiceDescriptor& descriptor) const;
+-
+-  template <typename DescriptorT, typename DescriptorProtoT>
+-  void PrintSerializedPbInterval(
+-      const DescriptorT& descriptor, DescriptorProtoT& proto) const;
+-
+-  void FixAllDescriptorOptions() const;
+-  void FixOptionsForField(const FieldDescriptor& field) const;
+-  void FixOptionsForOneof(const OneofDescriptor& oneof) const;
+-  void FixOptionsForEnum(const EnumDescriptor& descriptor) const;
+-  void FixOptionsForMessage(const Descriptor& descriptor) const;
+-
+-  void CopyPublicDependenciesAliases(
+-      const string& copy_from, const FileDescriptor* file) const;
+-
+-  // Very coarse-grained lock to ensure that Generate() is reentrant.
+-  // Guards file_, printer_ and file_descriptor_serialized_.
+-  mutable Mutex mutex_;
+-  mutable const FileDescriptor* file_;  // Set in Generate().  Under mutex_.
+-  mutable string file_descriptor_serialized_;
+-  mutable io::Printer* printer_;  // Set in Generate().  Under mutex_.
+-
+-  GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(Generator);
+-};
+-
+-}  // namespace python
+-}  // namespace compiler
+-}  // namespace protobuf
+-
+-}  // namespace google
+-#endif  // GOOGLE_PROTOBUF_COMPILER_PYTHON_GENERATOR_H__
+diff --git a/src/google/protobuf/compiler/python/python_plugin_unittest.cc b/src/google/protobuf/compiler/python/python_plugin_unittest.cc
+deleted file mode 100644
+index 34f857f..0000000
+--- a/src/google/protobuf/compiler/python/python_plugin_unittest.cc
++++ /dev/null
+@@ -1,170 +0,0 @@
+-// Protocol Buffers - Google's data interchange format
+-// Copyright 2008 Google Inc.  All rights reserved.
+-// https://developers.google.com/protocol-buffers/
+-//
+-// Redistribution and use in source and binary forms, with or without
+-// modification, are permitted provided that the following conditions are
+-// met:
+-//
+-//     * Redistributions of source code must retain the above copyright
+-// notice, this list of conditions and the following disclaimer.
+-//     * Redistributions in binary form must reproduce the above
+-// copyright notice, this list of conditions and the following disclaimer
+-// in the documentation and/or other materials provided with the
+-// distribution.
+-//     * Neither the name of Google Inc. nor the names of its
+-// contributors may be used to endorse or promote products derived from
+-// this software without specific prior written permission.
+-//
+-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+-
+-// Author: kenton@google.com (Kenton Varda)
+-//
+-// TODO(kenton):  Share code with the versions of this test in other languages?
+-//   It seemed like parameterizing it would add more complexity than it is
+-//   worth.
+-
+-#include <memory>
+-#ifndef _SHARED_PTR_H
+-#include <google/protobuf/stubs/shared_ptr.h>
+-#endif
+-
+-#include <google/protobuf/compiler/python/python_generator.h>
+-#include <google/protobuf/compiler/command_line_interface.h>
+-#include <google/protobuf/io/zero_copy_stream.h>
+-#include <google/protobuf/io/printer.h>
+-
+-#include <google/protobuf/testing/file.h>
+-#include <google/protobuf/testing/file.h>
+-#include <google/protobuf/stubs/strutil.h>
+-#include <google/protobuf/testing/googletest.h>
+-#include <gtest/gtest.h>
+-
+-namespace google {
+-namespace protobuf {
+-namespace compiler {
+-namespace python {
+-namespace {
+-
+-class TestGenerator : public CodeGenerator {
+- public:
+-  TestGenerator() {}
+-  ~TestGenerator() {}
+-
+-  virtual bool Generate(const FileDescriptor* file,
+-                        const string& parameter,
+-                        GeneratorContext* context,
+-                        string* error) const {
+-    TryInsert("test_pb2.py", "imports", context);
+-    TryInsert("test_pb2.py", "module_scope", context);
+-    TryInsert("test_pb2.py", "class_scope:foo.Bar", context);
+-    TryInsert("test_pb2.py", "class_scope:foo.Bar.Baz", context);
+-    return true;
+-  }
+-
+-  void TryInsert(const string& filename, const string& insertion_point,
+-                 GeneratorContext* context) const {
+-    google::protobuf::scoped_ptr<io::ZeroCopyOutputStream> output(
+-        context->OpenForInsert(filename, insertion_point));
+-    io::Printer printer(output.get(), '$');
+-    printer.Print("// inserted $name$\n", "name", insertion_point);
+-  }
+-};
+-
+-// This test verifies that all the expected insertion points exist.  It does
+-// not verify that they are correctly-placed; that would require actually
+-// compiling the output which is a bit more than I care to do for this test.
+-TEST(PythonPluginTest, PluginTest) {
+-  GOOGLE_CHECK_OK(File::SetContents(TestTempDir() + "/test.proto",
+-                             "syntax = \"proto2\";\n"
+-                             "package foo;\n"
+-                             "message Bar {\n"
+-                             "  message Baz {}\n"
+-                             "}\n",
+-                             true));
+-
+-  google::protobuf::compiler::CommandLineInterface cli;
+-  cli.SetInputsAreProtoPathRelative(true);
+-
+-  python::Generator python_generator;
+-  TestGenerator test_generator;
+-  cli.RegisterGenerator("--python_out", &python_generator, "");
+-  cli.RegisterGenerator("--test_out", &test_generator, "");
+-
+-  string proto_path = "-I" + TestTempDir();
+-  string python_out = "--python_out=" + TestTempDir();
+-  string test_out = "--test_out=" + TestTempDir();
+-
+-  const char* argv[] = {
+-    "protoc",
+-    proto_path.c_str(),
+-    python_out.c_str(),
+-    test_out.c_str(),
+-    "test.proto"
+-  };
+-
+-  EXPECT_EQ(0, cli.Run(5, argv));
+-}
+-
+-// This test verifies that the generated Python output uses regular imports (as
+-// opposed to importlib) in the usual case where the .proto file paths do not
+-// not contain any Python keywords.
+-TEST(PythonPluginTest, ImportTest) {
+-  // Create files test1.proto and test2.proto with the former importing the
+-  // latter.
+-  GOOGLE_CHECK_OK(File::SetContents(TestTempDir() + "/test1.proto",
+-                             "syntax = \"proto3\";\n"
+-                             "package foo;\n"
+-                             "import \"test2.proto\";"
+-                             "message Message1 {\n"
+-                             "  Message2 message_2 = 1;\n"
+-                             "}\n",
+-                             true));
+-  GOOGLE_CHECK_OK(File::SetContents(TestTempDir() + "/test2.proto",
+-                             "syntax = \"proto3\";\n"
+-                             "package foo;\n"
+-                             "message Message2 {}\n",
+-                             true));
+-
+-  google::protobuf::compiler::CommandLineInterface cli;
+-  cli.SetInputsAreProtoPathRelative(true);
+-  python::Generator python_generator;
+-  cli.RegisterGenerator("--python_out", &python_generator, "");
+-  string proto_path = "-I" + TestTempDir();
+-  string python_out = "--python_out=" + TestTempDir();
+-  const char* argv[] = {"protoc", proto_path.c_str(), "-I.", python_out.c_str(),
+-                        "test1.proto"};
+-  ASSERT_EQ(0, cli.Run(5, argv));
+-
+-  // Loop over the lines of the generated code and verify that we find an
+-  // ordinary Python import but do not find the string "importlib".
+-  string output;
+-  GOOGLE_CHECK_OK(File::GetContents(TestTempDir() + "/test1_pb2.py", &output,
+-                             true));
+-  std::vector<string> lines = Split(output, "\n");
+-  string expected_import = "import test2_pb2";
+-  bool found_expected_import = false;
+-  for (int i = 0; i < lines.size(); ++i) {
+-    if (lines[i].find(expected_import) != string::npos) {
+-      found_expected_import = true;
+-    }
+-    EXPECT_EQ(string::npos, lines[i].find("importlib"));
+-  }
+-  EXPECT_TRUE(found_expected_import);
+-}
+-
+-}  // namespace
+-}  // namespace python
+-}  // namespace compiler
+-}  // namespace protobuf
+-}  // namespace google
+diff --git a/src/google/protobuf/compiler/zip_output_unittest.sh b/src/google/protobuf/compiler/zip_output_unittest.sh
+index 4b09fb7..e55b7eb 100755
+--- a/src/google/protobuf/compiler/zip_output_unittest.sh
++++ b/src/google/protobuf/compiler/zip_output_unittest.sh
+@@ -52,7 +52,7 @@ echo '
+ ' > $TEST_TMPDIR/testzip.proto
+ 
+ $PROTOC \
+-    --cpp_out=$TEST_TMPDIR/testzip.zip --python_out=$TEST_TMPDIR/testzip.zip \
++    --cpp_out=$TEST_TMPDIR/testzip.zip \
+     -I$TEST_TMPDIR testzip.proto \
+     || fail 'protoc failed.'
+ 
+diff --git a/util/python/BUILD b/util/python/BUILD
+deleted file mode 100644
+index 3ac0385..0000000
+--- a/util/python/BUILD
++++ /dev/null
+@@ -1,18 +0,0 @@
+-# This is a placeholder for python headers. Projects needing to use
+-# fast cpp protos in protobuf's python interface should build with
+-# --define=use_fast_cpp_protos=true, and in addition, provide
+-# //external:python_headers dependency that in turn provides Python.h.
+-#
+-# Projects that include protobuf using a Bazel external repository will need to
+-# add a workspace rule to their WORKSPACE files to add an external workspace
+-# that includes the Python headers. For example, the protobuf WORKSPACE file
+-# includes the following local_repository rule that points to this directory:
+-#
+-# new_local_repository(
+-#   name = "python",
+-#   path = __workspace_dir__ + "/util/python",
+-# )
+-cc_library(
+-    name = "python_headers",
+-    visibility = ["//visibility:public"],
+-)
+-- 
+2.29.2
+

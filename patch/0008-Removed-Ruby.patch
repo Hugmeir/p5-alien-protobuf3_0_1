@@ -1,0 +1,1715 @@
+From 84d0805c75b137fd061f2d307c244674ac2c11c7 Mon Sep 17 00:00:00 2001
+From: Brian Fraser <brian.fraser@booking.com>
+Date: Sat, 21 Nov 2020 19:12:25 +0100
+Subject: [PATCH 8/8] Removed Ruby
+
+---
+ BUILD                                         |   2 -
+ Makefile.am                                   |  35 +-
+ Makefile.in                                   |  35 +-
+ cmake/extract_includes.bat.in                 |   2 -
+ cmake/libprotoc.cmake                         |   1 -
+ cmake/tests.cmake                             |   1 -
+ configure                                     |   2 +-
+ configure.ac                                  |   2 +-
+ conformance/Makefile.am                       |  15 +-
+ conformance/Makefile.in                       |  15 +-
+ conformance/conformance_ruby.rb               | 122 -----
+ conformance/failure_list_ruby.txt             | 209 --------
+ src/Makefile.am                               |   7 +-
+ src/Makefile.in                               |  49 +-
+ .../compiler/ruby/ruby_generated_code.proto   |  67 ---
+ .../compiler/ruby/ruby_generated_code_pb.rb   |  74 ---
+ .../protobuf/compiler/ruby/ruby_generator.cc  | 501 ------------------
+ .../protobuf/compiler/ruby/ruby_generator.h   |  64 ---
+ .../compiler/ruby/ruby_generator_unittest.cc  | 109 ----
+ 19 files changed, 19 insertions(+), 1293 deletions(-)
+ delete mode 100755 conformance/conformance_ruby.rb
+ delete mode 100644 conformance/failure_list_ruby.txt
+ delete mode 100644 src/google/protobuf/compiler/ruby/ruby_generated_code.proto
+ delete mode 100644 src/google/protobuf/compiler/ruby/ruby_generated_code_pb.rb
+ delete mode 100644 src/google/protobuf/compiler/ruby/ruby_generator.cc
+ delete mode 100644 src/google/protobuf/compiler/ruby/ruby_generator.h
+ delete mode 100644 src/google/protobuf/compiler/ruby/ruby_generator_unittest.cc
+
+diff --git a/BUILD b/BUILD
+index 2644914..8ba1e40 100644
+--- a/BUILD
++++ b/BUILD
+@@ -240,7 +240,6 @@ cc_library(
+         "src/google/protobuf/compiler/js/js_generator.cc",
+         "src/google/protobuf/compiler/plugin.cc",
+         "src/google/protobuf/compiler/plugin.pb.cc",
+-        "src/google/protobuf/compiler/ruby/ruby_generator.cc",
+         "src/google/protobuf/compiler/subprocess.cc",
+         "src/google/protobuf/compiler/zip_writer.cc",
+     ],
+@@ -369,7 +368,6 @@ cc_test(
+         "src/google/protobuf/compiler/importer_unittest.cc",
+         "src/google/protobuf/compiler/mock_code_generator.cc",
+         "src/google/protobuf/compiler/parser_unittest.cc",
+-        "src/google/protobuf/compiler/ruby/ruby_generator_unittest.cc",
+         "src/google/protobuf/descriptor_database_unittest.cc",
+         "src/google/protobuf/descriptor_unittest.cc",
+         "src/google/protobuf/drop_unknown_fields_test.cc",
+diff --git a/Makefile.am b/Makefile.am
+index 1099b64..7cff8d5 100644
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -44,39 +44,6 @@ clean-local:
+ pkgconfigdir = $(libdir)/pkgconfig
+ pkgconfig_DATA = protobuf.pc protobuf-lite.pc
+ 
+-ruby_EXTRA_DIST=                                                             \
+-  ruby/Gemfile                                                               \
+-  ruby/Gemfile.lock                                                          \
+-  ruby/.gitignore                                                            \
+-  ruby/README.md                                                             \
+-  ruby/Rakefile                                                              \
+-  ruby/ext/google/protobuf_c/defs.c                                          \
+-  ruby/ext/google/protobuf_c/encode_decode.c                                 \
+-  ruby/ext/google/protobuf_c/extconf.rb                                      \
+-  ruby/ext/google/protobuf_c/map.c                                           \
+-  ruby/ext/google/protobuf_c/message.c                                       \
+-  ruby/ext/google/protobuf_c/protobuf.c                                      \
+-  ruby/ext/google/protobuf_c/protobuf.h                                      \
+-  ruby/ext/google/protobuf_c/repeated_field.c                                \
+-  ruby/ext/google/protobuf_c/storage.c                                       \
+-  ruby/ext/google/protobuf_c/upb.c                                           \
+-  ruby/ext/google/protobuf_c/upb.h                                           \
+-  ruby/google-protobuf.gemspec                                               \
+-  ruby/lib/google/protobuf/message_exts.rb                                   \
+-  ruby/lib/google/protobuf/repeated_field.rb                                 \
+-  ruby/lib/google/protobuf/well_known_types.rb                               \
+-  ruby/lib/google/protobuf.rb                                                \
+-  ruby/pom.xml                                                               \
+-  ruby/src/main/sentinel.proto                                               \
+-  ruby/tests/basic.rb                                                        \
+-  ruby/tests/repeated_field_test.rb                                          \
+-  ruby/tests/stress.rb                                                       \
+-  ruby/tests/generated_code.proto                                            \
+-  ruby/tests/test_import.proto                                               \
+-  ruby/tests/generated_code_test.rb                                          \
+-  ruby/tests/well_known_types_test.rb                                        \
+-  ruby/travis-test.sh
+-
+ js_EXTRA_DIST=                              \
+   js/README.md                              \
+   js/binary/arith.js                        \
+@@ -122,7 +89,7 @@ js_EXTRA_DIST=                              \
+   js/testbinary.proto                       \
+   js/testempty.proto
+ 
+-all_EXTRA_DIST=$(ruby_EXTRA_DIST) $(js_EXTRA_DIST)
++all_EXTRA_DIST=$(js_EXTRA_DIST)
+ 
+ EXTRA_DIST = $(@DIST_LANG@_EXTRA_DIST)   \
+   autogen.sh                             \
+diff --git a/Makefile.in b/Makefile.in
+index e5a17ff..f318035 100644
+--- a/Makefile.in
++++ b/Makefile.in
+@@ -372,39 +372,6 @@ DIST_SUBDIRS = $(subdirs) src conformance benchmarks
+ pkgconfigdir = $(libdir)/pkgconfig
+ pkgconfig_DATA = protobuf.pc protobuf-lite.pc
+ 
+-ruby_EXTRA_DIST = \
+-  ruby/Gemfile                                                               \
+-  ruby/Gemfile.lock                                                          \
+-  ruby/.gitignore                                                            \
+-  ruby/README.md                                                             \
+-  ruby/Rakefile                                                              \
+-  ruby/ext/google/protobuf_c/defs.c                                          \
+-  ruby/ext/google/protobuf_c/encode_decode.c                                 \
+-  ruby/ext/google/protobuf_c/extconf.rb                                      \
+-  ruby/ext/google/protobuf_c/map.c                                           \
+-  ruby/ext/google/protobuf_c/message.c                                       \
+-  ruby/ext/google/protobuf_c/protobuf.c                                      \
+-  ruby/ext/google/protobuf_c/protobuf.h                                      \
+-  ruby/ext/google/protobuf_c/repeated_field.c                                \
+-  ruby/ext/google/protobuf_c/storage.c                                       \
+-  ruby/ext/google/protobuf_c/upb.c                                           \
+-  ruby/ext/google/protobuf_c/upb.h                                           \
+-  ruby/google-protobuf.gemspec                                               \
+-  ruby/lib/google/protobuf/message_exts.rb                                   \
+-  ruby/lib/google/protobuf/repeated_field.rb                                 \
+-  ruby/lib/google/protobuf/well_known_types.rb                               \
+-  ruby/lib/google/protobuf.rb                                                \
+-  ruby/pom.xml                                                               \
+-  ruby/src/main/sentinel.proto                                               \
+-  ruby/tests/basic.rb                                                        \
+-  ruby/tests/repeated_field_test.rb                                          \
+-  ruby/tests/stress.rb                                                       \
+-  ruby/tests/generated_code.proto                                            \
+-  ruby/tests/test_import.proto                                               \
+-  ruby/tests/generated_code_test.rb                                          \
+-  ruby/tests/well_known_types_test.rb                                        \
+-  ruby/travis-test.sh
+-
+ js_EXTRA_DIST = \
+   js/README.md                              \
+   js/binary/arith.js                        \
+@@ -450,7 +417,7 @@ js_EXTRA_DIST = \
+   js/testbinary.proto                       \
+   js/testempty.proto
+ 
+-all_EXTRA_DIST = $(ruby_EXTRA_DIST) $(js_EXTRA_DIST)
++all_EXTRA_DIST = $(js_EXTRA_DIST)
+ EXTRA_DIST = $(@DIST_LANG@_EXTRA_DIST)   \
+   autogen.sh                             \
+   generate_descriptor_proto.sh           \
+diff --git a/cmake/extract_includes.bat.in b/cmake/extract_includes.bat.in
+index 6a4fbac..ea507a1 100644
+--- a/cmake/extract_includes.bat.in
++++ b/cmake/extract_includes.bat.in
+@@ -4,7 +4,6 @@ mkdir include\google\protobuf
+ mkdir include\google\protobuf\compiler
+ mkdir include\google\protobuf\compiler\cpp
+ mkdir include\google\protobuf\compiler\js
+-mkdir include\google\protobuf\compiler\ruby
+ mkdir include\google\protobuf\io
+ mkdir include\google\protobuf\stubs
+ mkdir include\google\protobuf\util
+@@ -21,7 +20,6 @@ copy ${PROTOBUF_SOURCE_WIN32_PATH}\..\src\google\protobuf\compiler\js\js_generat
+ copy ${PROTOBUF_SOURCE_WIN32_PATH}\..\src\google\protobuf\compiler\parser.h include\google\protobuf\compiler\parser.h
+ copy ${PROTOBUF_SOURCE_WIN32_PATH}\..\src\google\protobuf\compiler\plugin.h include\google\protobuf\compiler\plugin.h
+ copy ${PROTOBUF_SOURCE_WIN32_PATH}\..\src\google\protobuf\compiler\plugin.pb.h include\google\protobuf\compiler\plugin.pb.h
+-copy ${PROTOBUF_SOURCE_WIN32_PATH}\..\src\google\protobuf\compiler\ruby\ruby_generator.h include\google\protobuf\compiler\ruby\ruby_generator.h
+ copy ${PROTOBUF_SOURCE_WIN32_PATH}\..\src\google\protobuf\descriptor.h include\google\protobuf\descriptor.h
+ copy ${PROTOBUF_SOURCE_WIN32_PATH}\..\src\google\protobuf\descriptor.pb.h include\google\protobuf\descriptor.pb.h
+ copy ${PROTOBUF_SOURCE_WIN32_PATH}\..\src\google\protobuf\descriptor_database.h include\google\protobuf\descriptor_database.h
+diff --git a/cmake/libprotoc.cmake b/cmake/libprotoc.cmake
+index 3e65b6e..86aabbb 100644
+--- a/cmake/libprotoc.cmake
++++ b/cmake/libprotoc.cmake
+@@ -17,7 +17,6 @@ set(libprotoc_files
+   ${protobuf_source_dir}/src/google/protobuf/compiler/js/js_generator.cc
+   ${protobuf_source_dir}/src/google/protobuf/compiler/plugin.cc
+   ${protobuf_source_dir}/src/google/protobuf/compiler/plugin.pb.cc
+-  ${protobuf_source_dir}/src/google/protobuf/compiler/ruby/ruby_generator.cc
+   ${protobuf_source_dir}/src/google/protobuf/compiler/subprocess.cc
+   ${protobuf_source_dir}/src/google/protobuf/compiler/zip_writer.cc
+ )
+diff --git a/cmake/tests.cmake b/cmake/tests.cmake
+index 51ba820..b1078fa 100644
+--- a/cmake/tests.cmake
++++ b/cmake/tests.cmake
+@@ -125,7 +125,6 @@ set(tests_files
+   ${protobuf_source_dir}/src/google/protobuf/compiler/importer_unittest.cc
+   ${protobuf_source_dir}/src/google/protobuf/compiler/mock_code_generator.cc
+   ${protobuf_source_dir}/src/google/protobuf/compiler/parser_unittest.cc
+-  ${protobuf_source_dir}/src/google/protobuf/compiler/ruby/ruby_generator_unittest.cc
+   ${protobuf_source_dir}/src/google/protobuf/descriptor_database_unittest.cc
+   ${protobuf_source_dir}/src/google/protobuf/descriptor_unittest.cc
+   ${protobuf_source_dir}/src/google/protobuf/drop_unknown_fields_test.cc
+diff --git a/configure b/configure
+index 1b52b9b..2274412 100755
+--- a/configure
++++ b/configure
+@@ -2570,7 +2570,7 @@ ac_config_headers="$ac_config_headers config.h"
+ 
+ case "$DIST_LANG" in
+   "") DIST_LANG=all ;;
+-  all | cpp | ruby | js ) ;;
++  all | cpp | js ) ;;
+   *) { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+ $as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+ as_fn_error $? "unknown language: $DIST_LANG
+diff --git a/configure.ac b/configure.ac
+index 6e14ca9..d23442b 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -29,7 +29,7 @@ AC_CONFIG_MACRO_DIR([m4])
+ AC_ARG_VAR(DIST_LANG, [language to include in the distribution package (i.e., make dist)])
+ case "$DIST_LANG" in
+   "") DIST_LANG=all ;;
+-  all | cpp | csharp | ruby | js ) ;;
++  all | cpp | csharp | js ) ;;
+   *) AC_MSG_FAILURE([unknown language: $DIST_LANG]) ;;
+ esac
+ AC_SUBST(DIST_LANG)
+diff --git a/conformance/Makefile.am b/conformance/Makefile.am
+index b32d220..cb40e79 100644
+--- a/conformance/Makefile.am
++++ b/conformance/Makefile.am
+@@ -52,9 +52,7 @@ bin_PROGRAMS = conformance-test-runner conformance-cpp
+ EXTRA_DIST =                  \
+   README.md                   \
+   conformance.proto           \
+-  conformance_ruby.rb         \
+-  failure_list_cpp.txt        \
+-  failure_list_ruby.txt
++  failure_list_cpp.txt
+ 
+ conformance_test_runner_LDADD = $(top_srcdir)/src/libprotobuf.la
+ conformance_test_runner_SOURCES = conformance_test.h conformance_test.cc \
+@@ -81,8 +79,8 @@ if USE_EXTERNAL_PROTOC
+ 
+ # Some implementations include pre-generated versions of well-known types.
+ protoc_middleman: $(conformance_protoc_inputs) $(well_known_type_protoc_inputs)
+-	$(PROTOC) -I$(srcdir) -I$(top_srcdir) --cpp_out=. --ruby_out=. $(conformance_protoc_inputs)
+-	$(PROTOC) -I$(srcdir) -I$(top_srcdir) --cpp_out=. --ruby_out=. $(well_known_type_protoc_inputs)
++	$(PROTOC) -I$(srcdir) -I$(top_srcdir) --cpp_out=. $(conformance_protoc_inputs)
++	$(PROTOC) -I$(srcdir) -I$(top_srcdir) --cpp_out=. $(well_known_type_protoc_inputs)
+ 	## $(PROTOC) -I$(srcdir) -I$(top_srcdir) $(conformance_protoc_inputs) $(well_known_type_protoc_inputs)
+ 	touch protoc_middleman
+ 
+@@ -92,8 +90,8 @@ else
+ # relative to srcdir, which may not be the same as the current directory when
+ # building out-of-tree.
+ protoc_middleman: $(top_srcdir)/src/protoc$(EXEEXT) $(conformance_protoc_inputs) $(well_known_type_protoc_inputs)
+-	oldpwd=`pwd` && ( cd $(srcdir) && $$oldpwd/../src/protoc$(EXEEXT) -I. -I$(top_srcdir)/src --cpp_out=$$oldpwd --ruby_out=$$oldpwd $(conformance_protoc_inputs) )
+-	oldpwd=`pwd` && ( cd $(srcdir) && $$oldpwd/../src/protoc$(EXEEXT) -I. -I$(top_srcdir)/src --cpp_out=$$oldpwd --ruby_out=$$oldpwd $(well_known_type_protoc_inputs) )
++	oldpwd=`pwd` && ( cd $(srcdir) && $$oldpwd/../src/protoc$(EXEEXT) -I. -I$(top_srcdir)/src --cpp_out=$$oldpwd $(conformance_protoc_inputs) )
++	oldpwd=`pwd` && ( cd $(srcdir) && $$oldpwd/../src/protoc$(EXEEXT) -I. -I$(top_srcdir)/src --cpp_out=$$oldpwd $(well_known_type_protoc_inputs) )
+ 	## @mkdir -p lite
+ 	## oldpwd=`pwd` && ( cd $(srcdir) && $$oldpwd/../src/protoc$(EXEEXT) -I. -I$(top_srcdir)/src $(conformance_protoc_inputs) $(well_known_type_protoc_inputs) )
+ 	touch protoc_middleman
+@@ -115,6 +113,3 @@ MAINTAINERCLEANFILES =   \
+ test_cpp: protoc_middleman conformance-test-runner conformance-cpp
+ 	./conformance-test-runner --enforce_recommended --failure_list failure_list_cpp.txt ./conformance-cpp
+ 
+-test_ruby: protoc_middleman conformance-test-runner $(other_language_protoc_outputs)
+-	RUBYLIB=../ruby/lib:. ./conformance-test-runner --enforce_recommended --failure_list failure_list_ruby.txt ./conformance_ruby.rb
+-
+diff --git a/conformance/Makefile.in b/conformance/Makefile.in
+index f99995f..2335340 100644
+--- a/conformance/Makefile.in
++++ b/conformance/Makefile.in
+@@ -391,9 +391,7 @@ other_language_protoc_outputs = \
+ EXTRA_DIST = \
+   README.md                   \
+   conformance.proto           \
+-  conformance_ruby.rb         \
+-  failure_list_cpp.txt        \
+-  failure_list_ruby.txt
++  failure_list_cpp.txt
+ 
+ conformance_test_runner_LDADD = $(top_srcdir)/src/libprotobuf.la
+ conformance_test_runner_SOURCES = conformance_test.h conformance_test.cc \
+@@ -894,16 +892,16 @@ conformance_cpp-conformance_cpp.$(OBJEXT): conformance.pb.h
+ 
+ # Some implementations include pre-generated versions of well-known types.
+ @USE_EXTERNAL_PROTOC_TRUE@protoc_middleman: $(conformance_protoc_inputs) $(well_known_type_protoc_inputs)
+-@USE_EXTERNAL_PROTOC_TRUE@	$(PROTOC) -I$(srcdir) -I$(top_srcdir) --cpp_out=. --ruby_out=. $(conformance_protoc_inputs)
+-@USE_EXTERNAL_PROTOC_TRUE@	$(PROTOC) -I$(srcdir) -I$(top_srcdir) --cpp_out=. --ruby_out=.$(well_known_type_protoc_inputs)
++@USE_EXTERNAL_PROTOC_TRUE@	$(PROTOC) -I$(srcdir) -I$(top_srcdir) --cpp_out=. $(conformance_protoc_inputs)
++@USE_EXTERNAL_PROTOC_TRUE@	$(PROTOC) -I$(srcdir) -I$(top_srcdir) --cpp_out=. $(well_known_type_protoc_inputs)
+ @USE_EXTERNAL_PROTOC_TRUE@	touch protoc_middleman
+ 
+ # We have to cd to $(srcdir) before executing protoc because $(protoc_inputs) is
+ # relative to srcdir, which may not be the same as the current directory when
+ # building out-of-tree.
+ @USE_EXTERNAL_PROTOC_FALSE@protoc_middleman: $(top_srcdir)/src/protoc$(EXEEXT) $(conformance_protoc_inputs) $(well_known_type_protoc_inputs)
+-@USE_EXTERNAL_PROTOC_FALSE@	oldpwd=`pwd` && ( cd $(srcdir) && $$oldpwd/../src/protoc$(EXEEXT) -I. -I$(top_srcdir)/src --cpp_out=$$oldpwd --ruby_out=$$oldpwd $(conformance_protoc_inputs) )
+-@USE_EXTERNAL_PROTOC_FALSE@	oldpwd=`pwd` && ( cd $(srcdir) && $$oldpwd/../src/protoc$(EXEEXT) -I. -I$(top_srcdir)/src --cpp_out=$$oldpwd --ruby_out=$$oldpwd $(well_known_type_protoc_inputs) )
++@USE_EXTERNAL_PROTOC_FALSE@	oldpwd=`pwd` && ( cd $(srcdir) && $$oldpwd/../src/protoc$(EXEEXT) -I. -I$(top_srcdir)/src --cpp_out=$$oldpwd $(conformance_protoc_inputs) )
++@USE_EXTERNAL_PROTOC_FALSE@	oldpwd=`pwd` && ( cd $(srcdir) && $$oldpwd/../src/protoc$(EXEEXT) -I. -I$(top_srcdir)/src --cpp_out=$$oldpwd $(well_known_type_protoc_inputs) )
+ @USE_EXTERNAL_PROTOC_FALSE@	touch protoc_middleman
+ 
+ $(protoc_outputs): protoc_middleman
+@@ -914,9 +912,6 @@ $(other_language_protoc_outputs): protoc_middleman
+ test_cpp: protoc_middleman conformance-test-runner conformance-cpp
+ 	./conformance-test-runner --enforce_recommended --failure_list failure_list_cpp.txt ./conformance-cpp
+ 
+-test_ruby: protoc_middleman conformance-test-runner $(other_language_protoc_outputs)
+-	RUBYLIB=../ruby/lib:. ./conformance-test-runner --enforce_recommended --failure_list failure_list_ruby.txt ./conformance_ruby.rb
+-
+ # Tell versions [3.59,3.63) of GNU make to not export all variables.
+ # Otherwise a system limit (for SysV at least) may be exceeded.
+ .NOEXPORT:
+diff --git a/conformance/conformance_ruby.rb b/conformance/conformance_ruby.rb
+deleted file mode 100755
+index aa57214..0000000
+--- a/conformance/conformance_ruby.rb
++++ /dev/null
+@@ -1,122 +0,0 @@
+-#!/usr/bin/env ruby
+-#
+-# Protocol Buffers - Google's data interchange format
+-# Copyright 2008 Google Inc.  All rights reserved.
+-# https://developers.google.com/protocol-buffers/
+-#
+-# Redistribution and use in source and binary forms, with or without
+-# modification, are permitted provided that the following conditions are
+-# met:
+-#
+-#     * Redistributions of source code must retain the above copyright
+-# notice, this list of conditions and the following disclaimer.
+-#     * Redistributions in binary form must reproduce the above
+-# copyright notice, this list of conditions and the following disclaimer
+-# in the documentation and/or other materials provided with the
+-# distribution.
+-#     * Neither the name of Google Inc. nor the names of its
+-# contributors may be used to endorse or promote products derived from
+-# this software without specific prior written permission.
+-#
+-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+-# "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+-# LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+-# A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+-# OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+-# SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+-# LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+-# DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+-# THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+-# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+-# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+-
+-require 'conformance_pb'
+-
+-$test_count = 0
+-$verbose = false
+-
+-def do_test(request)
+-  test_message = Conformance::TestAllTypes.new
+-  response = Conformance::ConformanceResponse.new
+-
+-  begin
+-    case request.payload
+-    when :protobuf_payload
+-      begin
+-        test_message =
+-          Conformance::TestAllTypes.decode(request.protobuf_payload)
+-      rescue Google::Protobuf::ParseError => err
+-        response.parse_error = err.message.encode('utf-8')
+-        return response
+-      end
+-
+-    when :json_payload
+-      begin
+-        test_message = Conformance::TestAllTypes.decode_json(request.json_payload)
+-      rescue Google::Protobuf::ParseError => err
+-        response.parse_error = err.message.encode('utf-8')
+-        return response
+-      end
+-
+-    when nil
+-      fail "Request didn't have payload"
+-    end
+-
+-    case request.requested_output_format
+-    when :UNSPECIFIED
+-      fail 'Unspecified output format'
+-
+-    when :PROTOBUF
+-      response.protobuf_payload = test_message.to_proto
+-
+-    when :JSON
+-      response.json_payload = test_message.to_json
+-
+-    when nil
+-      fail "Request didn't have requested output format"
+-    end
+-  rescue StandardError => err
+-    response.runtime_error = err.message.encode('utf-8')
+-  end
+-
+-  response
+-end
+-
+-# Returns true if the test ran successfully, false on legitimate EOF.
+-# If EOF is encountered in an unexpected place, raises IOError.
+-def do_test_io
+-  length_bytes = STDIN.read(4)
+-  return false if length_bytes.nil?
+-
+-  length = length_bytes.unpack('V').first
+-  serialized_request = STDIN.read(length)
+-  if serialized_request.nil? || serialized_request.length != length
+-    fail IOError
+-  end
+-
+-  request = Conformance::ConformanceRequest.decode(serialized_request)
+-
+-  response = do_test(request)
+-
+-  serialized_response = Conformance::ConformanceResponse.encode(response)
+-  STDOUT.write([serialized_response.length].pack('V'))
+-  STDOUT.write(serialized_response)
+-  STDOUT.flush
+-
+-  if $verbose
+-    STDERR.puts("conformance_ruby: request=#{request.to_json}, " \
+-                                 "response=#{response.to_json}\n")
+-  end
+-
+-  $test_count += 1
+-
+-  true
+-end
+-
+-loop do
+-  unless do_test_io
+-    STDERR.puts('conformance_ruby: received EOF from test runner ' \
+-                "after #{$test_count} tests, exiting")
+-    break
+-  end
+-end
+diff --git a/conformance/failure_list_ruby.txt b/conformance/failure_list_ruby.txt
+deleted file mode 100644
+index dbd5569..0000000
+--- a/conformance/failure_list_ruby.txt
++++ /dev/null
+@@ -1,209 +0,0 @@
+-Recommended.FieldMaskNumbersDontRoundTrip.JsonOutput
+-Recommended.FieldMaskPathsDontRoundTrip.JsonOutput
+-Recommended.FieldMaskTooManyUnderscore.JsonOutput
+-Recommended.JsonInput.BoolFieldIntegerOne
+-Recommended.JsonInput.BoolFieldIntegerZero
+-Recommended.JsonInput.DurationHas3FractionalDigits.Validator
+-Recommended.JsonInput.DurationHas6FractionalDigits.Validator
+-Recommended.JsonInput.DurationHas9FractionalDigits.Validator
+-Recommended.JsonInput.DurationHasZeroFractionalDigit.Validator
+-Recommended.JsonInput.FieldNameWithDoubleUnderscores.JsonOutput
+-Recommended.JsonInput.FieldNameWithDoubleUnderscores.ProtobufOutput
+-Recommended.JsonInput.FieldNameWithDoubleUnderscores.Validator
+-Recommended.JsonInput.Int64FieldBeString.Validator
+-Recommended.JsonInput.OneofZeroDouble.JsonOutput
+-Recommended.JsonInput.OneofZeroDouble.ProtobufOutput
+-Recommended.JsonInput.OneofZeroFloat.JsonOutput
+-Recommended.JsonInput.OneofZeroFloat.ProtobufOutput
+-Recommended.JsonInput.OneofZeroUint32.JsonOutput
+-Recommended.JsonInput.OneofZeroUint32.ProtobufOutput
+-Recommended.JsonInput.OneofZeroUint64.JsonOutput
+-Recommended.JsonInput.OneofZeroUint64.ProtobufOutput
+-Recommended.JsonInput.StringEndsWithEscapeChar
+-Recommended.JsonInput.StringFieldSurrogateInWrongOrder
+-Recommended.JsonInput.StringFieldUnpairedHighSurrogate
+-Recommended.JsonInput.StringFieldUnpairedLowSurrogate
+-Recommended.JsonInput.TimestampHas3FractionalDigits.Validator
+-Recommended.JsonInput.TimestampHas6FractionalDigits.Validator
+-Recommended.JsonInput.TimestampHas9FractionalDigits.Validator
+-Recommended.JsonInput.TimestampHasZeroFractionalDigit.Validator
+-Recommended.JsonInput.TimestampZeroNormalized.Validator
+-Recommended.JsonInput.Uint64FieldBeString.Validator
+-Required.DurationProtoInputTooLarge.JsonOutput
+-Required.DurationProtoInputTooSmall.JsonOutput
+-Required.JsonInput.Any.JsonOutput
+-Required.JsonInput.Any.ProtobufOutput
+-Required.JsonInput.AnyNested.JsonOutput
+-Required.JsonInput.AnyNested.ProtobufOutput
+-Required.JsonInput.AnyUnorderedTypeTag.JsonOutput
+-Required.JsonInput.AnyUnorderedTypeTag.ProtobufOutput
+-Required.JsonInput.AnyWithDuration.JsonOutput
+-Required.JsonInput.AnyWithDuration.ProtobufOutput
+-Required.JsonInput.AnyWithFieldMask.JsonOutput
+-Required.JsonInput.AnyWithFieldMask.ProtobufOutput
+-Required.JsonInput.AnyWithInt32ValueWrapper.JsonOutput
+-Required.JsonInput.AnyWithInt32ValueWrapper.ProtobufOutput
+-Required.JsonInput.AnyWithStruct.JsonOutput
+-Required.JsonInput.AnyWithStruct.ProtobufOutput
+-Required.JsonInput.AnyWithTimestamp.JsonOutput
+-Required.JsonInput.AnyWithTimestamp.ProtobufOutput
+-Required.JsonInput.AnyWithValueForInteger.JsonOutput
+-Required.JsonInput.AnyWithValueForInteger.ProtobufOutput
+-Required.JsonInput.AnyWithValueForJsonObject.JsonOutput
+-Required.JsonInput.AnyWithValueForJsonObject.ProtobufOutput
+-Required.JsonInput.DoubleFieldInfinity.JsonOutput
+-Required.JsonInput.DoubleFieldInfinity.ProtobufOutput
+-Required.JsonInput.DoubleFieldMaxNegativeValue.JsonOutput
+-Required.JsonInput.DoubleFieldMaxNegativeValue.ProtobufOutput
+-Required.JsonInput.DoubleFieldMaxPositiveValue.JsonOutput
+-Required.JsonInput.DoubleFieldMaxPositiveValue.ProtobufOutput
+-Required.JsonInput.DoubleFieldMinNegativeValue.JsonOutput
+-Required.JsonInput.DoubleFieldMinNegativeValue.ProtobufOutput
+-Required.JsonInput.DoubleFieldMinPositiveValue.JsonOutput
+-Required.JsonInput.DoubleFieldMinPositiveValue.ProtobufOutput
+-Required.JsonInput.DoubleFieldNan.JsonOutput
+-Required.JsonInput.DoubleFieldNan.ProtobufOutput
+-Required.JsonInput.DoubleFieldNegativeInfinity.JsonOutput
+-Required.JsonInput.DoubleFieldNegativeInfinity.ProtobufOutput
+-Required.JsonInput.DoubleFieldQuotedValue.JsonOutput
+-Required.JsonInput.DoubleFieldQuotedValue.ProtobufOutput
+-Required.JsonInput.DurationMaxValue.JsonOutput
+-Required.JsonInput.DurationMaxValue.ProtobufOutput
+-Required.JsonInput.DurationMinValue.JsonOutput
+-Required.JsonInput.DurationMinValue.ProtobufOutput
+-Required.JsonInput.DurationRepeatedValue.JsonOutput
+-Required.JsonInput.DurationRepeatedValue.ProtobufOutput
+-Required.JsonInput.EnumFieldNumericValueNonZero.JsonOutput
+-Required.JsonInput.EnumFieldNumericValueNonZero.ProtobufOutput
+-Required.JsonInput.EnumFieldNumericValueZero.JsonOutput
+-Required.JsonInput.EnumFieldNumericValueZero.ProtobufOutput
+-Required.JsonInput.EnumFieldUnknownValue.Validator
+-Required.JsonInput.FieldMask.JsonOutput
+-Required.JsonInput.FieldMask.ProtobufOutput
+-Required.JsonInput.FieldNameInLowerCamelCase.Validator
+-Required.JsonInput.FieldNameInSnakeCase.JsonOutput
+-Required.JsonInput.FieldNameInSnakeCase.ProtobufOutput
+-Required.JsonInput.FloatFieldInfinity.JsonOutput
+-Required.JsonInput.FloatFieldInfinity.ProtobufOutput
+-Required.JsonInput.FloatFieldNan.JsonOutput
+-Required.JsonInput.FloatFieldNan.ProtobufOutput
+-Required.JsonInput.FloatFieldNegativeInfinity.JsonOutput
+-Required.JsonInput.FloatFieldNegativeInfinity.ProtobufOutput
+-Required.JsonInput.FloatFieldQuotedValue.JsonOutput
+-Required.JsonInput.FloatFieldQuotedValue.ProtobufOutput
+-Required.JsonInput.FloatFieldTooLarge
+-Required.JsonInput.FloatFieldTooSmall
+-Required.JsonInput.Int32FieldExponentialFormat.JsonOutput
+-Required.JsonInput.Int32FieldExponentialFormat.ProtobufOutput
+-Required.JsonInput.Int32FieldFloatTrailingZero.JsonOutput
+-Required.JsonInput.Int32FieldFloatTrailingZero.ProtobufOutput
+-Required.JsonInput.Int32FieldMaxFloatValue.JsonOutput
+-Required.JsonInput.Int32FieldMaxFloatValue.ProtobufOutput
+-Required.JsonInput.Int32FieldMinFloatValue.JsonOutput
+-Required.JsonInput.Int32FieldMinFloatValue.ProtobufOutput
+-Required.JsonInput.Int32FieldStringValue.JsonOutput
+-Required.JsonInput.Int32FieldStringValue.ProtobufOutput
+-Required.JsonInput.Int32FieldStringValueEscaped.JsonOutput
+-Required.JsonInput.Int32FieldStringValueEscaped.ProtobufOutput
+-Required.JsonInput.Int32MapEscapedKey.JsonOutput
+-Required.JsonInput.Int32MapEscapedKey.ProtobufOutput
+-Required.JsonInput.Int32MapField.JsonOutput
+-Required.JsonInput.Int32MapField.ProtobufOutput
+-Required.JsonInput.Int64FieldMaxValue.JsonOutput
+-Required.JsonInput.Int64FieldMaxValue.ProtobufOutput
+-Required.JsonInput.Int64FieldMinValue.JsonOutput
+-Required.JsonInput.Int64FieldMinValue.ProtobufOutput
+-Required.JsonInput.Int64MapEscapedKey.JsonOutput
+-Required.JsonInput.Int64MapEscapedKey.ProtobufOutput
+-Required.JsonInput.Int64MapField.JsonOutput
+-Required.JsonInput.Int64MapField.ProtobufOutput
+-Required.JsonInput.MessageField.JsonOutput
+-Required.JsonInput.MessageField.ProtobufOutput
+-Required.JsonInput.MessageMapField.JsonOutput
+-Required.JsonInput.MessageMapField.ProtobufOutput
+-Required.JsonInput.MessageRepeatedField.JsonOutput
+-Required.JsonInput.MessageRepeatedField.ProtobufOutput
+-Required.JsonInput.OptionalBoolWrapper.JsonOutput
+-Required.JsonInput.OptionalBoolWrapper.ProtobufOutput
+-Required.JsonInput.OptionalBytesWrapper.JsonOutput
+-Required.JsonInput.OptionalBytesWrapper.ProtobufOutput
+-Required.JsonInput.OptionalDoubleWrapper.JsonOutput
+-Required.JsonInput.OptionalDoubleWrapper.ProtobufOutput
+-Required.JsonInput.OptionalFloatWrapper.JsonOutput
+-Required.JsonInput.OptionalFloatWrapper.ProtobufOutput
+-Required.JsonInput.OptionalInt32Wrapper.JsonOutput
+-Required.JsonInput.OptionalInt32Wrapper.ProtobufOutput
+-Required.JsonInput.OptionalInt64Wrapper.JsonOutput
+-Required.JsonInput.OptionalInt64Wrapper.ProtobufOutput
+-Required.JsonInput.OptionalStringWrapper.JsonOutput
+-Required.JsonInput.OptionalStringWrapper.ProtobufOutput
+-Required.JsonInput.OptionalUint32Wrapper.JsonOutput
+-Required.JsonInput.OptionalUint32Wrapper.ProtobufOutput
+-Required.JsonInput.OptionalUint64Wrapper.JsonOutput
+-Required.JsonInput.OptionalUint64Wrapper.ProtobufOutput
+-Required.JsonInput.OptionalWrapperTypesWithNonDefaultValue.JsonOutput
+-Required.JsonInput.OptionalWrapperTypesWithNonDefaultValue.ProtobufOutput
+-Required.JsonInput.PrimitiveRepeatedField.JsonOutput
+-Required.JsonInput.PrimitiveRepeatedField.ProtobufOutput
+-Required.JsonInput.RepeatedBoolWrapper.JsonOutput
+-Required.JsonInput.RepeatedBoolWrapper.ProtobufOutput
+-Required.JsonInput.RepeatedBytesWrapper.JsonOutput
+-Required.JsonInput.RepeatedBytesWrapper.ProtobufOutput
+-Required.JsonInput.RepeatedDoubleWrapper.JsonOutput
+-Required.JsonInput.RepeatedDoubleWrapper.ProtobufOutput
+-Required.JsonInput.RepeatedFieldWrongElementTypeExpectingStringsGotInt
+-Required.JsonInput.RepeatedFloatWrapper.JsonOutput
+-Required.JsonInput.RepeatedFloatWrapper.ProtobufOutput
+-Required.JsonInput.RepeatedInt32Wrapper.JsonOutput
+-Required.JsonInput.RepeatedInt32Wrapper.ProtobufOutput
+-Required.JsonInput.RepeatedInt64Wrapper.JsonOutput
+-Required.JsonInput.RepeatedInt64Wrapper.ProtobufOutput
+-Required.JsonInput.RepeatedStringWrapper.JsonOutput
+-Required.JsonInput.RepeatedStringWrapper.ProtobufOutput
+-Required.JsonInput.RepeatedUint32Wrapper.JsonOutput
+-Required.JsonInput.RepeatedUint32Wrapper.ProtobufOutput
+-Required.JsonInput.RepeatedUint64Wrapper.JsonOutput
+-Required.JsonInput.RepeatedUint64Wrapper.ProtobufOutput
+-Required.JsonInput.StringFieldNotAString
+-Required.JsonInput.StringFieldSurrogatePair.JsonOutput
+-Required.JsonInput.StringFieldSurrogatePair.ProtobufOutput
+-Required.JsonInput.Struct.JsonOutput
+-Required.JsonInput.Struct.ProtobufOutput
+-Required.JsonInput.TimestampMaxValue.JsonOutput
+-Required.JsonInput.TimestampMaxValue.ProtobufOutput
+-Required.JsonInput.TimestampMinValue.JsonOutput
+-Required.JsonInput.TimestampMinValue.ProtobufOutput
+-Required.JsonInput.TimestampRepeatedValue.JsonOutput
+-Required.JsonInput.TimestampRepeatedValue.ProtobufOutput
+-Required.JsonInput.TimestampWithNegativeOffset.JsonOutput
+-Required.JsonInput.TimestampWithNegativeOffset.ProtobufOutput
+-Required.JsonInput.TimestampWithPositiveOffset.JsonOutput
+-Required.JsonInput.TimestampWithPositiveOffset.ProtobufOutput
+-Required.JsonInput.Uint32FieldMaxFloatValue.JsonOutput
+-Required.JsonInput.Uint32FieldMaxFloatValue.ProtobufOutput
+-Required.JsonInput.Uint32MapField.JsonOutput
+-Required.JsonInput.Uint32MapField.ProtobufOutput
+-Required.JsonInput.Uint64FieldMaxValue.JsonOutput
+-Required.JsonInput.Uint64FieldMaxValue.ProtobufOutput
+-Required.JsonInput.Uint64MapField.JsonOutput
+-Required.JsonInput.Uint64MapField.ProtobufOutput
+-Required.JsonInput.ValueAcceptBool.JsonOutput
+-Required.JsonInput.ValueAcceptBool.ProtobufOutput
+-Required.JsonInput.ValueAcceptFloat.JsonOutput
+-Required.JsonInput.ValueAcceptFloat.ProtobufOutput
+-Required.JsonInput.ValueAcceptInteger.JsonOutput
+-Required.JsonInput.ValueAcceptInteger.ProtobufOutput
+-Required.JsonInput.ValueAcceptList.JsonOutput
+-Required.JsonInput.ValueAcceptList.ProtobufOutput
+-Required.JsonInput.ValueAcceptNull.JsonOutput
+-Required.JsonInput.ValueAcceptNull.ProtobufOutput
+-Required.JsonInput.ValueAcceptObject.JsonOutput
+-Required.JsonInput.ValueAcceptObject.ProtobufOutput
+-Required.JsonInput.ValueAcceptString.JsonOutput
+-Required.JsonInput.ValueAcceptString.ProtobufOutput
+-Required.ProtobufInput.DoubleFieldNormalizeQuietNan.JsonOutput
+-Required.ProtobufInput.DoubleFieldNormalizeSignalingNan.JsonOutput
+-Required.ProtobufInput.FloatFieldNormalizeQuietNan.JsonOutput
+-Required.ProtobufInput.FloatFieldNormalizeSignalingNan.JsonOutput
+-Required.TimestampProtoInputTooLarge.JsonOutput
+-Required.TimestampProtoInputTooSmall.JsonOutput
+diff --git a/src/Makefile.am b/src/Makefile.am
+index 3ed6809..374e9c6 100644
+--- a/src/Makefile.am
++++ b/src/Makefile.am
+@@ -156,7 +156,6 @@ nobase_include_HEADERS =                                        \
+   google/protobuf/compiler/plugin.pb.h                          \
+   google/protobuf/compiler/cpp/cpp_generator.h                  \
+   google/protobuf/compiler/js/js_generator.h                    \
+-  google/protobuf/compiler/ruby/ruby_generator.h                \
+   google/protobuf/util/type_resolver.h                          \
+   google/protobuf/util/field_comparator.h                       \
+   google/protobuf/util/field_mask_util.h                        \
+@@ -329,8 +328,7 @@ libprotoc_la_SOURCES =                                         \
+   google/protobuf/compiler/cpp/cpp_service.h                   \
+   google/protobuf/compiler/cpp/cpp_string_field.cc             \
+   google/protobuf/compiler/cpp/cpp_string_field.h              \
+-  google/protobuf/compiler/js/js_generator.cc                  \
+-  google/protobuf/compiler/ruby/ruby_generator.cc
++  google/protobuf/compiler/js/js_generator.cc
+ 
+ bin_PROGRAMS = protoc
+ protoc_LDADD = $(PTHREAD_LIBS) libprotobuf.la libprotoc.la
+@@ -407,8 +405,6 @@ EXTRA_DIST =                                                   \
+   google/protobuf/package_info.h                               \
+   google/protobuf/io/package_info.h                            \
+   google/protobuf/util/package_info.h                          \
+-  google/protobuf/compiler/ruby/ruby_generated_code.proto      \
+-  google/protobuf/compiler/ruby/ruby_generated_code_pb.rb      \
+   google/protobuf/compiler/package_info.h                      \
+   google/protobuf/compiler/zip_output_unittest.sh              \
+   README.md
+@@ -609,7 +605,6 @@ protobuf_test_SOURCES =                                        \
+   google/protobuf/compiler/cpp/cpp_unittest.cc                 \
+   google/protobuf/compiler/cpp/cpp_plugin_unittest.cc          \
+   google/protobuf/compiler/cpp/metadata_test.cc                \
+-  google/protobuf/compiler/ruby/ruby_generator_unittest.cc     \
+   google/protobuf/util/field_comparator_test.cc                \
+   google/protobuf/util/field_mask_util_test.cc                 \
+   google/protobuf/util/internal/default_value_objectwriter_test.cc \
+diff --git a/src/Makefile.in b/src/Makefile.in
+index ca9b3c9..3d874d1 100644
+--- a/src/Makefile.in
++++ b/src/Makefile.in
+@@ -266,8 +266,7 @@ am_libprotoc_la_OBJECTS = google/protobuf/compiler/code_generator.lo \
+ 	google/protobuf/compiler/cpp/cpp_primitive_field.lo \
+ 	google/protobuf/compiler/cpp/cpp_service.lo \
+ 	google/protobuf/compiler/cpp/cpp_string_field.lo \
+-	google/protobuf/compiler/js/js_generator.lo \
+-	google/protobuf/compiler/ruby/ruby_generator.lo
++	google/protobuf/compiler/js/js_generator.lo
+ libprotoc_la_OBJECTS = $(am_libprotoc_la_OBJECTS)
+ libprotoc_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) \
+ 	$(LIBTOOLFLAGS) --mode=link $(CXXLD) $(AM_CXXFLAGS) \
+@@ -493,7 +492,6 @@ am_protobuf_test_OBJECTS = google/protobuf/stubs/protobuf_test-bytestream_unitte
+ 	google/protobuf/compiler/cpp/protobuf_test-cpp_unittest.$(OBJEXT) \
+ 	google/protobuf/compiler/cpp/protobuf_test-cpp_plugin_unittest.$(OBJEXT) \
+ 	google/protobuf/compiler/cpp/protobuf_test-metadata_test.$(OBJEXT) \
+-	google/protobuf/compiler/ruby/protobuf_test-ruby_generator_unittest.$(OBJEXT) \
+ 	google/protobuf/util/protobuf_test-field_comparator_test.$(OBJEXT) \
+ 	google/protobuf/util/protobuf_test-field_mask_util_test.$(OBJEXT) \
+ 	google/protobuf/util/internal/protobuf_test-default_value_objectwriter_test.$(OBJEXT) \
+@@ -738,7 +736,6 @@ am__nobase_include_HEADERS_DIST =  \
+ 	google/protobuf/compiler/plugin.pb.h \
+ 	google/protobuf/compiler/cpp/cpp_generator.h \
+ 	google/protobuf/compiler/js/js_generator.h \
+-	google/protobuf/compiler/ruby/ruby_generator.h \
+ 	google/protobuf/util/type_resolver.h \
+ 	google/protobuf/util/field_comparator.h \
+ 	google/protobuf/util/field_mask_util.h \
+@@ -1219,7 +1216,6 @@ nobase_include_HEADERS = \
+   google/protobuf/compiler/plugin.pb.h                          \
+   google/protobuf/compiler/cpp/cpp_generator.h                  \
+   google/protobuf/compiler/js/js_generator.h                    \
+-  google/protobuf/compiler/ruby/ruby_generator.h                \
+   google/protobuf/util/type_resolver.h                          \
+   google/protobuf/util/field_comparator.h                       \
+   google/protobuf/util/field_mask_util.h                        \
+@@ -1390,8 +1386,7 @@ libprotoc_la_SOURCES = \
+   google/protobuf/compiler/cpp/cpp_service.h                   \
+   google/protobuf/compiler/cpp/cpp_string_field.cc             \
+   google/protobuf/compiler/cpp/cpp_string_field.h              \
+-  google/protobuf/compiler/js/js_generator.cc                  \
+-  google/protobuf/compiler/ruby/ruby_generator.cc
++  google/protobuf/compiler/js/js_generator.cc
+ 
+ protoc_LDADD = $(PTHREAD_LIBS) libprotobuf.la libprotoc.la
+ protoc_SOURCES = google/protobuf/compiler/main.cc
+@@ -1466,8 +1461,6 @@ EXTRA_DIST = \
+   google/protobuf/package_info.h                               \
+   google/protobuf/io/package_info.h                            \
+   google/protobuf/util/package_info.h                          \
+-  google/protobuf/compiler/ruby/ruby_generated_code.proto      \
+-  google/protobuf/compiler/ruby/ruby_generated_code_pb.rb      \
+   google/protobuf/compiler/package_info.h                      \
+   google/protobuf/compiler/zip_output_unittest.sh              \
+   README.md
+@@ -1647,7 +1640,6 @@ protobuf_test_SOURCES = \
+   google/protobuf/compiler/cpp/cpp_unittest.cc                 \
+   google/protobuf/compiler/cpp/cpp_plugin_unittest.cc          \
+   google/protobuf/compiler/cpp/metadata_test.cc                \
+-  google/protobuf/compiler/ruby/ruby_generator_unittest.cc     \
+   google/protobuf/util/field_comparator_test.cc                \
+   google/protobuf/util/field_mask_util_test.cc                 \
+   google/protobuf/util/internal/default_value_objectwriter_test.cc \
+@@ -2123,15 +2115,6 @@ google/protobuf/compiler/js/$(DEPDIR)/$(am__dirstamp):
+ google/protobuf/compiler/js/js_generator.lo:  \
+ 	google/protobuf/compiler/js/$(am__dirstamp) \
+ 	google/protobuf/compiler/js/$(DEPDIR)/$(am__dirstamp)
+-google/protobuf/compiler/ruby/$(am__dirstamp):
+-	@$(MKDIR_P) google/protobuf/compiler/ruby
+-	@: > google/protobuf/compiler/ruby/$(am__dirstamp)
+-google/protobuf/compiler/ruby/$(DEPDIR)/$(am__dirstamp):
+-	@$(MKDIR_P) google/protobuf/compiler/ruby/$(DEPDIR)
+-	@: > google/protobuf/compiler/ruby/$(DEPDIR)/$(am__dirstamp)
+-google/protobuf/compiler/ruby/ruby_generator.lo:  \
+-	google/protobuf/compiler/ruby/$(am__dirstamp) \
+-	google/protobuf/compiler/ruby/$(DEPDIR)/$(am__dirstamp)
+ 
+ libprotoc.la: $(libprotoc_la_OBJECTS) $(libprotoc_la_DEPENDENCIES) $(EXTRA_libprotoc_la_DEPENDENCIES)
+ 	$(AM_V_CXXLD)$(libprotoc_la_LINK) -rpath $(libdir) $(libprotoc_la_OBJECTS) $(libprotoc_la_LIBADD) $(LIBS)
+@@ -2716,9 +2699,6 @@ google/protobuf/compiler/cpp/protobuf_test-cpp_plugin_unittest.$(OBJEXT):  \
+ google/protobuf/compiler/cpp/protobuf_test-metadata_test.$(OBJEXT):  \
+ 	google/protobuf/compiler/cpp/$(am__dirstamp) \
+ 	google/protobuf/compiler/cpp/$(DEPDIR)/$(am__dirstamp)
+-google/protobuf/compiler/ruby/protobuf_test-ruby_generator_unittest.$(OBJEXT):  \
+-	google/protobuf/compiler/ruby/$(am__dirstamp) \
+-	google/protobuf/compiler/ruby/$(DEPDIR)/$(am__dirstamp)
+ google/protobuf/util/protobuf_test-field_comparator_test.$(OBJEXT):  \
+ 	google/protobuf/util/$(am__dirstamp) \
+ 	google/protobuf/util/$(DEPDIR)/$(am__dirstamp)
+@@ -2957,8 +2937,6 @@ mostlyclean-compile:
+ 	-rm -f google/protobuf/compiler/cpp/*.lo
+ 	-rm -f google/protobuf/compiler/js/*.$(OBJEXT)
+ 	-rm -f google/protobuf/compiler/js/*.lo
+-	-rm -f google/protobuf/compiler/ruby/*.$(OBJEXT)
+-	-rm -f google/protobuf/compiler/ruby/*.lo
+ 	-rm -f google/protobuf/io/*.$(OBJEXT)
+ 	-rm -f google/protobuf/io/*.lo
+ 	-rm -f google/protobuf/stubs/*.$(OBJEXT)
+@@ -3186,8 +3164,6 @@ distclean-compile:
+ @AMDEP_TRUE@@am__include@ @am__quote@google/protobuf/compiler/cpp/$(DEPDIR)/protobuf_test-cpp_unittest.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@google/protobuf/compiler/cpp/$(DEPDIR)/protobuf_test-metadata_test.Po@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@google/protobuf/compiler/js/$(DEPDIR)/js_generator.Plo@am__quote@
+-@AMDEP_TRUE@@am__include@ @am__quote@google/protobuf/compiler/ruby/$(DEPDIR)/protobuf_test-ruby_generator_unittest.Po@am__quote@
+-@AMDEP_TRUE@@am__include@ @am__quote@google/protobuf/compiler/ruby/$(DEPDIR)/ruby_generator.Plo@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@google/protobuf/io/$(DEPDIR)/coded_stream.Plo@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@google/protobuf/io/$(DEPDIR)/gzip_stream.Plo@am__quote@
+ @AMDEP_TRUE@@am__include@ @am__quote@google/protobuf/io/$(DEPDIR)/printer.Plo@am__quote@
+@@ -5655,20 +5631,6 @@ google/protobuf/compiler/cpp/protobuf_test-metadata_test.obj: google/protobuf/co
+ @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+ @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(protobuf_test_CPPFLAGS) $(CPPFLAGS) $(protobuf_test_CXXFLAGS) $(CXXFLAGS) -c -o google/protobuf/compiler/cpp/protobuf_test-metadata_test.obj `if test -f 'google/protobuf/compiler/cpp/metadata_test.cc'; then $(CYGPATH_W) 'google/protobuf/compiler/cpp/metadata_test.cc'; else $(CYGPATH_W) '$(srcdir)/google/protobuf/compiler/cpp/metadata_test.cc'; fi`
+ 
+-google/protobuf/compiler/ruby/protobuf_test-ruby_generator_unittest.o: google/protobuf/compiler/ruby/ruby_generator_unittest.cc
+-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(protobuf_test_CPPFLAGS) $(CPPFLAGS) $(protobuf_test_CXXFLAGS) $(CXXFLAGS) -MT google/protobuf/compiler/ruby/protobuf_test-ruby_generator_unittest.o -MD -MP -MF google/protobuf/compiler/ruby/$(DEPDIR)/protobuf_test-ruby_generator_unittest.Tpo -c -o google/protobuf/compiler/ruby/protobuf_test-ruby_generator_unittest.o `test -f 'google/protobuf/compiler/ruby/ruby_generator_unittest.cc' || echo '$(srcdir)/'`google/protobuf/compiler/ruby/ruby_generator_unittest.cc
+-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) google/protobuf/compiler/ruby/$(DEPDIR)/protobuf_test-ruby_generator_unittest.Tpo google/protobuf/compiler/ruby/$(DEPDIR)/protobuf_test-ruby_generator_unittest.Po
+-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='google/protobuf/compiler/ruby/ruby_generator_unittest.cc' object='google/protobuf/compiler/ruby/protobuf_test-ruby_generator_unittest.o' libtool=no @AMDEPBACKSLASH@
+-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(protobuf_test_CPPFLAGS) $(CPPFLAGS) $(protobuf_test_CXXFLAGS) $(CXXFLAGS) -c -o google/protobuf/compiler/ruby/protobuf_test-ruby_generator_unittest.o `test -f 'google/protobuf/compiler/ruby/ruby_generator_unittest.cc' || echo '$(srcdir)/'`google/protobuf/compiler/ruby/ruby_generator_unittest.cc
+-
+-google/protobuf/compiler/ruby/protobuf_test-ruby_generator_unittest.obj: google/protobuf/compiler/ruby/ruby_generator_unittest.cc
+-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(protobuf_test_CPPFLAGS) $(CPPFLAGS) $(protobuf_test_CXXFLAGS) $(CXXFLAGS) -MT google/protobuf/compiler/ruby/protobuf_test-ruby_generator_unittest.obj -MD -MP -MF google/protobuf/compiler/ruby/$(DEPDIR)/protobuf_test-ruby_generator_unittest.Tpo -c -o google/protobuf/compiler/ruby/protobuf_test-ruby_generator_unittest.obj `if test -f 'google/protobuf/compiler/ruby/ruby_generator_unittest.cc'; then $(CYGPATH_W) 'google/protobuf/compiler/ruby/ruby_generator_unittest.cc'; else $(CYGPATH_W) '$(srcdir)/google/protobuf/compiler/ruby/ruby_generator_unittest.cc'; fi`
+-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) google/protobuf/compiler/ruby/$(DEPDIR)/protobuf_test-ruby_generator_unittest.Tpo google/protobuf/compiler/ruby/$(DEPDIR)/protobuf_test-ruby_generator_unittest.Po
+-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='google/protobuf/compiler/ruby/ruby_generator_unittest.cc' object='google/protobuf/compiler/ruby/protobuf_test-ruby_generator_unittest.obj' libtool=no @AMDEPBACKSLASH@
+-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(protobuf_test_CPPFLAGS) $(CPPFLAGS) $(protobuf_test_CXXFLAGS) $(CXXFLAGS) -c -o google/protobuf/compiler/ruby/protobuf_test-ruby_generator_unittest.obj `if test -f 'google/protobuf/compiler/ruby/ruby_generator_unittest.cc'; then $(CYGPATH_W) 'google/protobuf/compiler/ruby/ruby_generator_unittest.cc'; else $(CYGPATH_W) '$(srcdir)/google/protobuf/compiler/ruby/ruby_generator_unittest.cc'; fi`
+-
+ google/protobuf/util/protobuf_test-field_comparator_test.o: google/protobuf/util/field_comparator_test.cc
+ @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(protobuf_test_CPPFLAGS) $(CPPFLAGS) $(protobuf_test_CXXFLAGS) $(CXXFLAGS) -MT google/protobuf/util/protobuf_test-field_comparator_test.o -MD -MP -MF google/protobuf/util/$(DEPDIR)/protobuf_test-field_comparator_test.Tpo -c -o google/protobuf/util/protobuf_test-field_comparator_test.o `test -f 'google/protobuf/util/field_comparator_test.cc' || echo '$(srcdir)/'`google/protobuf/util/field_comparator_test.cc
+ @am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) google/protobuf/util/$(DEPDIR)/protobuf_test-field_comparator_test.Tpo google/protobuf/util/$(DEPDIR)/protobuf_test-field_comparator_test.Po
+@@ -6602,7 +6564,6 @@ clean-libtool:
+ 	-rm -rf google/protobuf/compiler/.libs google/protobuf/compiler/_libs
+ 	-rm -rf google/protobuf/compiler/cpp/.libs google/protobuf/compiler/cpp/_libs
+ 	-rm -rf google/protobuf/compiler/js/.libs google/protobuf/compiler/js/_libs
+-	-rm -rf google/protobuf/compiler/ruby/.libs google/protobuf/compiler/ruby/_libs
+ 	-rm -rf google/protobuf/io/.libs google/protobuf/io/_libs
+ 	-rm -rf google/protobuf/stubs/.libs google/protobuf/stubs/_libs
+ 	-rm -rf google/protobuf/util/.libs google/protobuf/util/_libs
+@@ -6994,8 +6955,6 @@ distclean-generic:
+ 	-rm -f google/protobuf/compiler/cpp/$(am__dirstamp)
+ 	-rm -f google/protobuf/compiler/js/$(DEPDIR)/$(am__dirstamp)
+ 	-rm -f google/protobuf/compiler/js/$(am__dirstamp)
+-	-rm -f google/protobuf/compiler/ruby/$(DEPDIR)/$(am__dirstamp)
+-	-rm -f google/protobuf/compiler/ruby/$(am__dirstamp)
+ 	-rm -f google/protobuf/io/$(DEPDIR)/$(am__dirstamp)
+ 	-rm -f google/protobuf/io/$(am__dirstamp)
+ 	-rm -f google/protobuf/stubs/$(DEPDIR)/$(am__dirstamp)
+@@ -7020,7 +6979,7 @@ clean-am: clean-binPROGRAMS clean-checkPROGRAMS clean-generic \
+ 	clean-libLTLIBRARIES clean-libtool clean-local mostlyclean-am
+ 
+ distclean: distclean-am
+-	-rm -rf ./$(DEPDIR) google/protobuf/$(DEPDIR) google/protobuf/compiler/$(DEPDIR) google/protobuf/compiler/cpp/$(DEPDIR) google/protobuf/compiler/js/$(DEPDIR) google/protobuf/compiler/ruby/$(DEPDIR) google/protobuf/io/$(DEPDIR) google/protobuf/stubs/$(DEPDIR) google/protobuf/testing/$(DEPDIR) google/protobuf/util/$(DEPDIR) google/protobuf/util/internal/$(DEPDIR) google/protobuf/util/internal/testdata/$(DEPDIR)
++	-rm -rf ./$(DEPDIR) google/protobuf/$(DEPDIR) google/protobuf/compiler/$(DEPDIR) google/protobuf/compiler/cpp/$(DEPDIR) google/protobuf/compiler/js/$(DEPDIR) google/protobuf/io/$(DEPDIR) google/protobuf/stubs/$(DEPDIR) google/protobuf/testing/$(DEPDIR) google/protobuf/util/$(DEPDIR) google/protobuf/util/internal/$(DEPDIR) google/protobuf/util/internal/testdata/$(DEPDIR)
+ 	-rm -f Makefile
+ distclean-am: clean-am distclean-compile distclean-generic \
+ 	distclean-tags
+@@ -7067,7 +7026,7 @@ install-ps-am:
+ installcheck-am:
+ 
+ maintainer-clean: maintainer-clean-am
+-	-rm -rf ./$(DEPDIR) google/protobuf/$(DEPDIR) google/protobuf/compiler/$(DEPDIR) google/protobuf/compiler/cpp/$(DEPDIR) google/protobuf/compiler/js/$(DEPDIR) google/protobuf/compiler/ruby/$(DEPDIR) google/protobuf/io/$(DEPDIR) google/protobuf/stubs/$(DEPDIR) google/protobuf/testing/$(DEPDIR) google/protobuf/util/$(DEPDIR) google/protobuf/util/internal/$(DEPDIR) google/protobuf/util/internal/testdata/$(DEPDIR)
++	-rm -rf ./$(DEPDIR) google/protobuf/$(DEPDIR) google/protobuf/compiler/$(DEPDIR) google/protobuf/compiler/cpp/$(DEPDIR) google/protobuf/compiler/js/$(DEPDIR) google/protobuf/io/$(DEPDIR) google/protobuf/stubs/$(DEPDIR) google/protobuf/testing/$(DEPDIR) google/protobuf/util/$(DEPDIR) google/protobuf/util/internal/$(DEPDIR) google/protobuf/util/internal/testdata/$(DEPDIR)
+ 	-rm -f Makefile
+ maintainer-clean-am: distclean-am maintainer-clean-generic
+ 
+diff --git a/src/google/protobuf/compiler/ruby/ruby_generated_code.proto b/src/google/protobuf/compiler/ruby/ruby_generated_code.proto
+deleted file mode 100644
+index 42d82a6..0000000
+--- a/src/google/protobuf/compiler/ruby/ruby_generated_code.proto
++++ /dev/null
+@@ -1,67 +0,0 @@
+-syntax = "proto3";
+-
+-package A.B.C;
+-
+-message TestMessage {
+-  int32 optional_int32 = 1;
+-  int64 optional_int64 = 2;
+-  uint32 optional_uint32 = 3;
+-  uint64 optional_uint64 = 4;
+-  bool optional_bool = 5;
+-  double optional_double = 6;
+-  float optional_float = 7;
+-  string optional_string = 8;
+-  bytes optional_bytes = 9;
+-  TestEnum optional_enum = 10;
+-  TestMessage optional_msg = 11;
+-
+-  repeated int32 repeated_int32 = 21;
+-  repeated int64 repeated_int64 = 22;
+-  repeated uint32 repeated_uint32 = 23;
+-  repeated uint64 repeated_uint64 = 24;
+-  repeated bool repeated_bool = 25;
+-  repeated double repeated_double = 26;
+-  repeated float repeated_float = 27;
+-  repeated string repeated_string = 28;
+-  repeated bytes repeated_bytes = 29;
+-  repeated TestEnum repeated_enum = 30;
+-  repeated TestMessage repeated_msg = 31;
+-
+-  oneof my_oneof {
+-    int32 oneof_int32 = 41;
+-    int64 oneof_int64 = 42;
+-    uint32 oneof_uint32 = 43;
+-    uint64 oneof_uint64 = 44;
+-    bool oneof_bool = 45;
+-    double oneof_double = 46;
+-    float oneof_float = 47;
+-    string oneof_string = 48;
+-    bytes oneof_bytes = 49;
+-    TestEnum oneof_enum = 50;
+-    TestMessage oneof_msg = 51;
+-  }
+-
+-  map<int32, string> map_int32_string = 61;
+-  map<int64, string> map_int64_string = 62;
+-  map<uint32, string> map_uint32_string = 63;
+-  map<uint64, string> map_uint64_string = 64;
+-  map<bool, string> map_bool_string = 65;
+-  map<string, string> map_string_string = 66;
+-  map<string, TestMessage> map_string_msg = 67;
+-  map<string, TestEnum> map_string_enum = 68;
+-  map<string, int32> map_string_int32 = 69;
+-  map<string, bool> map_string_bool = 70;
+-
+-  message NestedMessage {
+-    int32 foo = 1;
+-  }
+-
+-  NestedMessage nested_message = 80;
+-}
+-
+-enum TestEnum {
+-  Default = 0;
+-  A = 1;
+-  B = 2;
+-  C = 3;
+-}
+diff --git a/src/google/protobuf/compiler/ruby/ruby_generated_code_pb.rb b/src/google/protobuf/compiler/ruby/ruby_generated_code_pb.rb
+deleted file mode 100644
+index 49b23fb..0000000
+--- a/src/google/protobuf/compiler/ruby/ruby_generated_code_pb.rb
++++ /dev/null
+@@ -1,74 +0,0 @@
+-# Generated by the protocol buffer compiler.  DO NOT EDIT!
+-# source: ruby_generated_code.proto
+-
+-require 'google/protobuf'
+-
+-Google::Protobuf::DescriptorPool.generated_pool.build do
+-  add_message "A.B.C.TestMessage" do
+-    optional :optional_int32, :int32, 1
+-    optional :optional_int64, :int64, 2
+-    optional :optional_uint32, :uint32, 3
+-    optional :optional_uint64, :uint64, 4
+-    optional :optional_bool, :bool, 5
+-    optional :optional_double, :double, 6
+-    optional :optional_float, :float, 7
+-    optional :optional_string, :string, 8
+-    optional :optional_bytes, :bytes, 9
+-    optional :optional_enum, :enum, 10, "A.B.C.TestEnum"
+-    optional :optional_msg, :message, 11, "A.B.C.TestMessage"
+-    repeated :repeated_int32, :int32, 21
+-    repeated :repeated_int64, :int64, 22
+-    repeated :repeated_uint32, :uint32, 23
+-    repeated :repeated_uint64, :uint64, 24
+-    repeated :repeated_bool, :bool, 25
+-    repeated :repeated_double, :double, 26
+-    repeated :repeated_float, :float, 27
+-    repeated :repeated_string, :string, 28
+-    repeated :repeated_bytes, :bytes, 29
+-    repeated :repeated_enum, :enum, 30, "A.B.C.TestEnum"
+-    repeated :repeated_msg, :message, 31, "A.B.C.TestMessage"
+-    map :map_int32_string, :int32, :string, 61
+-    map :map_int64_string, :int64, :string, 62
+-    map :map_uint32_string, :uint32, :string, 63
+-    map :map_uint64_string, :uint64, :string, 64
+-    map :map_bool_string, :bool, :string, 65
+-    map :map_string_string, :string, :string, 66
+-    map :map_string_msg, :string, :message, 67, "A.B.C.TestMessage"
+-    map :map_string_enum, :string, :enum, 68, "A.B.C.TestEnum"
+-    map :map_string_int32, :string, :int32, 69
+-    map :map_string_bool, :string, :bool, 70
+-    optional :nested_message, :message, 80, "A.B.C.TestMessage.NestedMessage"
+-    oneof :my_oneof do
+-      optional :oneof_int32, :int32, 41
+-      optional :oneof_int64, :int64, 42
+-      optional :oneof_uint32, :uint32, 43
+-      optional :oneof_uint64, :uint64, 44
+-      optional :oneof_bool, :bool, 45
+-      optional :oneof_double, :double, 46
+-      optional :oneof_float, :float, 47
+-      optional :oneof_string, :string, 48
+-      optional :oneof_bytes, :bytes, 49
+-      optional :oneof_enum, :enum, 50, "A.B.C.TestEnum"
+-      optional :oneof_msg, :message, 51, "A.B.C.TestMessage"
+-    end
+-  end
+-  add_message "A.B.C.TestMessage.NestedMessage" do
+-    optional :foo, :int32, 1
+-  end
+-  add_enum "A.B.C.TestEnum" do
+-    value :Default, 0
+-    value :A, 1
+-    value :B, 2
+-    value :C, 3
+-  end
+-end
+-
+-module A
+-  module B
+-    module C
+-      TestMessage = Google::Protobuf::DescriptorPool.generated_pool.lookup("A.B.C.TestMessage").msgclass
+-      TestMessage::NestedMessage = Google::Protobuf::DescriptorPool.generated_pool.lookup("A.B.C.TestMessage.NestedMessage").msgclass
+-      TestEnum = Google::Protobuf::DescriptorPool.generated_pool.lookup("A.B.C.TestEnum").enummodule
+-    end
+-  end
+-end
+diff --git a/src/google/protobuf/compiler/ruby/ruby_generator.cc b/src/google/protobuf/compiler/ruby/ruby_generator.cc
+deleted file mode 100644
+index fbe3b4c..0000000
+--- a/src/google/protobuf/compiler/ruby/ruby_generator.cc
++++ /dev/null
+@@ -1,501 +0,0 @@
+-// Protocol Buffers - Google's data interchange format
+-// Copyright 2008 Google Inc.  All rights reserved.
+-// https://developers.google.com/protocol-buffers/
+-//
+-// Redistribution and use in source and binary forms, with or without
+-// modification, are permitted provided that the following conditions are
+-// met:
+-//
+-//     * Redistributions of source code must retain the above copyright
+-// notice, this list of conditions and the following disclaimer.
+-//     * Redistributions in binary form must reproduce the above
+-// copyright notice, this list of conditions and the following disclaimer
+-// in the documentation and/or other materials provided with the
+-// distribution.
+-//     * Neither the name of Google Inc. nor the names of its
+-// contributors may be used to endorse or promote products derived from
+-// this software without specific prior written permission.
+-//
+-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+-
+-#include <sstream>
+-
+-#include <google/protobuf/compiler/code_generator.h>
+-#include <google/protobuf/compiler/plugin.h>
+-#include <google/protobuf/descriptor.h>
+-#include <google/protobuf/descriptor.pb.h>
+-#include <google/protobuf/io/printer.h>
+-#include <google/protobuf/io/zero_copy_stream.h>
+-
+-#include <google/protobuf/compiler/ruby/ruby_generator.h>
+-
+-using google::protobuf::internal::scoped_ptr;
+-
+-namespace google {
+-namespace protobuf {
+-namespace compiler {
+-namespace ruby {
+-
+-// Forward decls.
+-std::string IntToString(int32 value);
+-std::string GetRequireName(const std::string& proto_file);
+-std::string LabelForField(google::protobuf::FieldDescriptor* field);
+-std::string TypeName(google::protobuf::FieldDescriptor* field);
+-void GenerateMessage(const google::protobuf::Descriptor* message,
+-                     google::protobuf::io::Printer* printer);
+-void GenerateEnum(const google::protobuf::EnumDescriptor* en,
+-                  google::protobuf::io::Printer* printer);
+-void GenerateMessageAssignment(
+-    const std::string& prefix,
+-    const google::protobuf::Descriptor* message,
+-    google::protobuf::io::Printer* printer);
+-void GenerateEnumAssignment(
+-    const std::string& prefix,
+-    const google::protobuf::EnumDescriptor* en,
+-    google::protobuf::io::Printer* printer);
+-
+-std::string IntToString(int32 value) {
+-  std::ostringstream os;
+-  os << value;
+-  return os.str();
+-}
+-
+-std::string GetRequireName(const std::string& proto_file) {
+-  int lastindex = proto_file.find_last_of(".");
+-  return proto_file.substr(0, lastindex) + "_pb";
+-}
+-
+-std::string GetOutputFilename(const std::string& proto_file) {
+-  return GetRequireName(proto_file) + ".rb";
+-}
+-
+-std::string LabelForField(const google::protobuf::FieldDescriptor* field) {
+-  switch (field->label()) {
+-    case FieldDescriptor::LABEL_OPTIONAL: return "optional";
+-    case FieldDescriptor::LABEL_REQUIRED: return "required";
+-    case FieldDescriptor::LABEL_REPEATED: return "repeated";
+-    default: assert(false); return "";
+-  }
+-}
+-
+-std::string TypeName(const google::protobuf::FieldDescriptor* field) {
+-  switch (field->type()) {
+-    case FieldDescriptor::TYPE_INT32: return "int32";
+-    case FieldDescriptor::TYPE_INT64: return "int64";
+-    case FieldDescriptor::TYPE_UINT32: return "uint32";
+-    case FieldDescriptor::TYPE_UINT64: return "uint64";
+-    case FieldDescriptor::TYPE_SINT32: return "sint32";
+-    case FieldDescriptor::TYPE_SINT64: return "sint64";
+-    case FieldDescriptor::TYPE_FIXED32: return "fixed32";
+-    case FieldDescriptor::TYPE_FIXED64: return "fixed64";
+-    case FieldDescriptor::TYPE_SFIXED32: return "sfixed32";
+-    case FieldDescriptor::TYPE_SFIXED64: return "sfixed64";
+-    case FieldDescriptor::TYPE_DOUBLE: return "double";
+-    case FieldDescriptor::TYPE_FLOAT: return "float";
+-    case FieldDescriptor::TYPE_BOOL: return "bool";
+-    case FieldDescriptor::TYPE_ENUM: return "enum";
+-    case FieldDescriptor::TYPE_STRING: return "string";
+-    case FieldDescriptor::TYPE_BYTES: return "bytes";
+-    case FieldDescriptor::TYPE_MESSAGE: return "message";
+-    case FieldDescriptor::TYPE_GROUP: return "group";
+-    default: assert(false); return "";
+-  }
+-}
+-
+-void GenerateField(const google::protobuf::FieldDescriptor* field,
+-                   google::protobuf::io::Printer* printer) {
+-
+-  if (field->is_map()) {
+-    const FieldDescriptor* key_field =
+-        field->message_type()->FindFieldByNumber(1);
+-    const FieldDescriptor* value_field =
+-        field->message_type()->FindFieldByNumber(2);
+-
+-    printer->Print(
+-      "map :$name$, :$key_type$, :$value_type$, $number$",
+-      "name", field->name(),
+-      "key_type", TypeName(key_field),
+-      "value_type", TypeName(value_field),
+-      "number", IntToString(field->number()));
+-
+-    if (value_field->cpp_type() == FieldDescriptor::CPPTYPE_MESSAGE) {
+-      printer->Print(
+-        ", \"$subtype$\"\n",
+-        "subtype", value_field->message_type()->full_name());
+-    } else if (value_field->cpp_type() == FieldDescriptor::CPPTYPE_ENUM) {
+-      printer->Print(
+-        ", \"$subtype$\"\n",
+-        "subtype", value_field->enum_type()->full_name());
+-    } else {
+-      printer->Print("\n");
+-    }
+-  } else {
+-
+-    printer->Print(
+-      "$label$ :$name$, ",
+-      "label", LabelForField(field),
+-      "name", field->name());
+-    printer->Print(
+-      ":$type$, $number$",
+-      "type", TypeName(field),
+-      "number", IntToString(field->number()));
+-
+-    if (field->cpp_type() == FieldDescriptor::CPPTYPE_MESSAGE) {
+-      printer->Print(
+-        ", \"$subtype$\"\n",
+-       "subtype", field->message_type()->full_name());
+-    } else if (field->cpp_type() == FieldDescriptor::CPPTYPE_ENUM) {
+-      printer->Print(
+-        ", \"$subtype$\"\n",
+-        "subtype", field->enum_type()->full_name());
+-    } else {
+-      printer->Print("\n");
+-    }
+-  }
+-}
+-
+-void GenerateOneof(const google::protobuf::OneofDescriptor* oneof,
+-                   google::protobuf::io::Printer* printer) {
+-  printer->Print(
+-      "oneof :$name$ do\n",
+-      "name", oneof->name());
+-  printer->Indent();
+-
+-  for (int i = 0; i < oneof->field_count(); i++) {
+-    const FieldDescriptor* field = oneof->field(i);
+-    GenerateField(field, printer);
+-  }
+-
+-  printer->Outdent();
+-  printer->Print("end\n");
+-}
+-
+-void GenerateMessage(const google::protobuf::Descriptor* message,
+-                     google::protobuf::io::Printer* printer) {
+-
+-  // Don't generate MapEntry messages -- we use the Ruby extension's native
+-  // support for map fields instead.
+-  if (message->options().map_entry()) {
+-    return;
+-  }
+-
+-  printer->Print(
+-    "add_message \"$name$\" do\n",
+-    "name", message->full_name());
+-  printer->Indent();
+-
+-  for (int i = 0; i < message->field_count(); i++) {
+-    const FieldDescriptor* field = message->field(i);
+-    if (!field->containing_oneof()) {
+-      GenerateField(field, printer);
+-    }
+-  }
+-
+-  for (int i = 0; i < message->oneof_decl_count(); i++) {
+-    const OneofDescriptor* oneof = message->oneof_decl(i);
+-    GenerateOneof(oneof, printer);
+-  }
+-
+-  printer->Outdent();
+-  printer->Print("end\n");
+-
+-  for (int i = 0; i < message->nested_type_count(); i++) {
+-    GenerateMessage(message->nested_type(i), printer);
+-  }
+-  for (int i = 0; i < message->enum_type_count(); i++) {
+-    GenerateEnum(message->enum_type(i), printer);
+-  }
+-}
+-
+-void GenerateEnum(const google::protobuf::EnumDescriptor* en,
+-                  google::protobuf::io::Printer* printer) {
+-  printer->Print(
+-    "add_enum \"$name$\" do\n",
+-    "name", en->full_name());
+-  printer->Indent();
+-
+-  for (int i = 0; i < en->value_count(); i++) {
+-    const EnumValueDescriptor* value = en->value(i);
+-    printer->Print(
+-      "value :$name$, $number$\n",
+-      "name", value->name(),
+-      "number", IntToString(value->number()));
+-  }
+-
+-  printer->Outdent();
+-  printer->Print(
+-    "end\n");
+-}
+-
+-// Locale-agnostic utility functions.
+-bool IsLower(char ch) { return ch >= 'a' && ch <= 'z'; }
+-
+-bool IsUpper(char ch) { return ch >= 'A' && ch <= 'Z'; }
+-
+-bool IsAlpha(char ch) { return IsLower(ch) || IsUpper(ch); }
+-
+-char ToUpper(char ch) { return IsLower(ch) ? (ch - 'a' + 'A') : ch; }
+-
+-
+-// Package names in protobuf are snake_case by convention, but Ruby module
+-// names must be PascalCased.
+-//
+-//   foo_bar_baz -> FooBarBaz
+-std::string PackageToModule(const std::string& name) {
+-  bool next_upper = true;
+-  std::string result;
+-  result.reserve(name.size());
+-
+-  for (int i = 0; i < name.size(); i++) {
+-    if (name[i] == '_') {
+-      next_upper = true;
+-    } else {
+-      if (next_upper) {
+-        result.push_back(ToUpper(name[i]));
+-      } else {
+-        result.push_back(name[i]);
+-      }
+-      next_upper = false;
+-    }
+-  }
+-
+-  return result;
+-}
+-
+-// Class and enum names in protobuf should be PascalCased by convention, but
+-// since there is nothing enforcing this we need to ensure that they are valid
+-// Ruby constants.  That mainly means making sure that the first character is
+-// an upper-case letter.
+-std::string RubifyConstant(const std::string& name) {
+-  std::string ret = name;
+-  if (!ret.empty()) {
+-    if (IsLower(ret[0])) {
+-      // If it starts with a lowercase letter, capitalize it.
+-      ret[0] = ToUpper(ret[0]);
+-    } else if (!IsAlpha(ret[0])) {
+-      // Otherwise (e.g. if it begins with an underscore), we need to come up
+-      // with some prefix that starts with a capital letter. We could be smarter
+-      // here, e.g. try to strip leading underscores, but this may cause other
+-      // problems if the user really intended the name. So let's just prepend a
+-      // well-known suffix.
+-      ret = "PB_" + ret;
+-    }
+-  }
+-
+-  return ret;
+-}
+-
+-void GenerateMessageAssignment(
+-    const std::string& prefix,
+-    const google::protobuf::Descriptor* message,
+-    google::protobuf::io::Printer* printer) {
+-
+-  // Don't generate MapEntry messages -- we use the Ruby extension's native
+-  // support for map fields instead.
+-  if (message->options().map_entry()) {
+-    return;
+-  }
+-
+-  printer->Print(
+-    "$prefix$$name$ = ",
+-    "prefix", prefix,
+-    "name", RubifyConstant(message->name()));
+-  printer->Print(
+-    "Google::Protobuf::DescriptorPool.generated_pool."
+-    "lookup(\"$full_name$\").msgclass\n",
+-    "full_name", message->full_name());
+-
+-  std::string nested_prefix = prefix + message->name() + "::";
+-  for (int i = 0; i < message->nested_type_count(); i++) {
+-    GenerateMessageAssignment(nested_prefix, message->nested_type(i), printer);
+-  }
+-  for (int i = 0; i < message->enum_type_count(); i++) {
+-    GenerateEnumAssignment(nested_prefix, message->enum_type(i), printer);
+-  }
+-}
+-
+-void GenerateEnumAssignment(
+-    const std::string& prefix,
+-    const google::protobuf::EnumDescriptor* en,
+-    google::protobuf::io::Printer* printer) {
+-  printer->Print(
+-    "$prefix$$name$ = ",
+-    "prefix", prefix,
+-    "name", RubifyConstant(en->name()));
+-  printer->Print(
+-    "Google::Protobuf::DescriptorPool.generated_pool."
+-    "lookup(\"$full_name$\").enummodule\n",
+-    "full_name", en->full_name());
+-}
+-
+-int GeneratePackageModules(
+-    std::string package_name,
+-    google::protobuf::io::Printer* printer) {
+-  int levels = 0;
+-  while (!package_name.empty()) {
+-    size_t dot_index = package_name.find(".");
+-    string component;
+-    if (dot_index == string::npos) {
+-      component = package_name;
+-      package_name = "";
+-    } else {
+-      component = package_name.substr(0, dot_index);
+-      package_name = package_name.substr(dot_index + 1);
+-    }
+-    component = PackageToModule(component);
+-    printer->Print(
+-      "module $name$\n",
+-      "name", component);
+-    printer->Indent();
+-    levels++;
+-  }
+-  return levels;
+-}
+-
+-void EndPackageModules(
+-    int levels,
+-    google::protobuf::io::Printer* printer) {
+-  while (levels > 0) {
+-    levels--;
+-    printer->Outdent();
+-    printer->Print(
+-      "end\n");
+-  }
+-}
+-
+-bool UsesTypeFromFile(const Descriptor* message, const FileDescriptor* file,
+-                      string* error) {
+-  for (int i = 0; i < message->field_count(); i++) {
+-    const FieldDescriptor* field = message->field(i);
+-    if ((field->cpp_type() == FieldDescriptor::CPPTYPE_MESSAGE &&
+-         field->message_type()->file() == file) ||
+-        (field->type() == FieldDescriptor::TYPE_ENUM &&
+-         field->enum_type()->file() == file)) {
+-      *error = "proto3 message field " + field->full_name() + " in file " +
+-               file->name() + " has a dependency on a type from proto2 file " +
+-               file->name() +
+-               ".  Ruby doesn't support proto2 yet, so we must fail.";
+-      return true;
+-    }
+-  }
+-
+-  for (int i = 0; i < message->nested_type_count(); i++) {
+-    if (UsesTypeFromFile(message->nested_type(i), file, error)) {
+-      return true;
+-    }
+-  }
+-
+-  return false;
+-}
+-
+-// Ruby doesn't currently support proto2.  This causes a failure even for proto3
+-// files that import proto2.  But in some cases, the proto2 file is only being
+-// imported to extend another proto2 message.  The prime example is declaring
+-// custom options by extending FileOptions/FieldOptions/etc.
+-//
+-// If the proto3 messages don't have any proto2 submessages, it is safe to omit
+-// the dependency completely.  Users won't be able to use any proto2 extensions,
+-// but they already couldn't because proto2 messages aren't supported.
+-//
+-// If/when we add proto2 support, we should remove this.
+-bool MaybeEmitDependency(const FileDescriptor* import,
+-                         const FileDescriptor* from,
+-                         io::Printer* printer,
+-                         string* error) {
+-  if (import->syntax() == FileDescriptor::SYNTAX_PROTO2) {
+-    for (int i = 0; i < from->message_type_count(); i++) {
+-      if (UsesTypeFromFile(from->message_type(i), import, error)) {
+-        // Error text was already set by UsesTypeFromFile().
+-        return false;
+-      }
+-    }
+-
+-    // Ok to omit this proto2 dependency -- so we won't print anything.
+-    GOOGLE_LOG(WARNING) << "Omitting proto2 dependency '" << import->name()
+-                        << "' from proto3 output file '"
+-                        << GetOutputFilename(from->name())
+-                        << "' because we don't support proto2 and no proto2 "
+-                           "types from that file are being used.";
+-    return true;
+-  } else {
+-    printer->Print(
+-      "require '$name$'\n", "name", GetRequireName(import->name()));
+-    return true;
+-  }
+-}
+-
+-bool GenerateFile(const FileDescriptor* file, io::Printer* printer,
+-                  string* error) {
+-  printer->Print(
+-    "# Generated by the protocol buffer compiler.  DO NOT EDIT!\n"
+-    "# source: $filename$\n"
+-    "\n",
+-    "filename", file->name());
+-
+-  printer->Print(
+-    "require 'google/protobuf'\n\n");
+-
+-  for (int i = 0; i < file->dependency_count(); i++) {
+-    if (!MaybeEmitDependency(file->dependency(i), file, printer, error)) {
+-      return false;
+-    }
+-  }
+-
+-  printer->Print(
+-    "Google::Protobuf::DescriptorPool.generated_pool.build do\n");
+-  printer->Indent();
+-  for (int i = 0; i < file->message_type_count(); i++) {
+-    GenerateMessage(file->message_type(i), printer);
+-  }
+-  for (int i = 0; i < file->enum_type_count(); i++) {
+-    GenerateEnum(file->enum_type(i), printer);
+-  }
+-  printer->Outdent();
+-  printer->Print(
+-    "end\n\n");
+-
+-  int levels = GeneratePackageModules(file->package(), printer);
+-  for (int i = 0; i < file->message_type_count(); i++) {
+-    GenerateMessageAssignment("", file->message_type(i), printer);
+-  }
+-  for (int i = 0; i < file->enum_type_count(); i++) {
+-    GenerateEnumAssignment("", file->enum_type(i), printer);
+-  }
+-  EndPackageModules(levels, printer);
+-  return true;
+-}
+-
+-bool Generator::Generate(
+-    const FileDescriptor* file,
+-    const string& parameter,
+-    GeneratorContext* generator_context,
+-    string* error) const {
+-
+-  if (file->syntax() != FileDescriptor::SYNTAX_PROTO3) {
+-    *error =
+-        "Can only generate Ruby code for proto3 .proto files.\n"
+-        "Please add 'syntax = \"proto3\";' to the top of your .proto file.\n";
+-    return false;
+-  }
+-
+-  scoped_ptr<io::ZeroCopyOutputStream> output(
+-      generator_context->Open(GetOutputFilename(file->name())));
+-  io::Printer printer(output.get(), '$');
+-
+-  return GenerateFile(file, &printer, error);
+-}
+-
+-}  // namespace ruby
+-}  // namespace compiler
+-}  // namespace protobuf
+-}  // namespace google
+diff --git a/src/google/protobuf/compiler/ruby/ruby_generator.h b/src/google/protobuf/compiler/ruby/ruby_generator.h
+deleted file mode 100644
+index 8c1dfa2..0000000
+--- a/src/google/protobuf/compiler/ruby/ruby_generator.h
++++ /dev/null
+@@ -1,64 +0,0 @@
+-// Protocol Buffers - Google's data interchange format
+-// Copyright 2008 Google Inc.  All rights reserved.
+-// https://developers.google.com/protocol-buffers/
+-//
+-// Redistribution and use in source and binary forms, with or without
+-// modification, are permitted provided that the following conditions are
+-// met:
+-//
+-//     * Redistributions of source code must retain the above copyright
+-// notice, this list of conditions and the following disclaimer.
+-//     * Redistributions in binary form must reproduce the above
+-// copyright notice, this list of conditions and the following disclaimer
+-// in the documentation and/or other materials provided with the
+-// distribution.
+-//     * Neither the name of Google Inc. nor the names of its
+-// contributors may be used to endorse or promote products derived from
+-// this software without specific prior written permission.
+-//
+-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+-
+-// Generates Ruby code for a given .proto file.
+-
+-#ifndef GOOGLE_PROTOBUF_COMPILER_RUBY_GENERATOR_H__
+-#define GOOGLE_PROTOBUF_COMPILER_RUBY_GENERATOR_H__
+-
+-#include <string>
+-
+-#include <google/protobuf/compiler/code_generator.h>
+-
+-namespace google {
+-namespace protobuf {
+-namespace compiler {
+-namespace ruby {
+-
+-// CodeGenerator implementation for generated Ruby protocol buffer classes.
+-// If you create your own protocol compiler binary and you want it to support
+-// Ruby output, you can do so by registering an instance of this
+-// CodeGenerator with the CommandLineInterface in your main() function.
+-class LIBPROTOC_EXPORT Generator
+-    : public google::protobuf::compiler::CodeGenerator {
+-  virtual bool Generate(
+-      const FileDescriptor* file,
+-      const string& parameter,
+-      GeneratorContext* generator_context,
+-      string* error) const;
+-};
+-
+-}  // namespace ruby
+-}  // namespace compiler
+-}  // namespace protobuf
+-}  // namespace google
+-
+-#endif  // GOOGLE_PROTOBUF_COMPILER_RUBY_GENERATOR_H__
+-
+diff --git a/src/google/protobuf/compiler/ruby/ruby_generator_unittest.cc b/src/google/protobuf/compiler/ruby/ruby_generator_unittest.cc
+deleted file mode 100644
+index 1aabe8a..0000000
+--- a/src/google/protobuf/compiler/ruby/ruby_generator_unittest.cc
++++ /dev/null
+@@ -1,109 +0,0 @@
+-// Protocol Buffers - Google's data interchange format
+-// Copyright 2014 Google Inc.  All rights reserved.
+-// https://developers.google.com/protocol-buffers/
+-//
+-// Redistribution and use in source and binary forms, with or without
+-// modification, are permitted provided that the following conditions are
+-// met:
+-//
+-//     * Redistributions of source code must retain the above copyright
+-// notice, this list of conditions and the following disclaimer.
+-//     * Redistributions in binary form must reproduce the above
+-// copyright notice, this list of conditions and the following disclaimer
+-// in the documentation and/or other materials provided with the
+-// distribution.
+-//     * Neither the name of Google Inc. nor the names of its
+-// contributors may be used to endorse or promote products derived from
+-// this software without specific prior written permission.
+-//
+-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+-
+-#include <memory>
+-
+-#include <google/protobuf/compiler/ruby/ruby_generator.h>
+-#include <google/protobuf/compiler/command_line_interface.h>
+-#include <google/protobuf/io/zero_copy_stream.h>
+-#include <google/protobuf/io/printer.h>
+-
+-#include <google/protobuf/testing/googletest.h>
+-#include <gtest/gtest.h>
+-#include <google/protobuf/testing/file.h>
+-
+-namespace google {
+-namespace protobuf {
+-namespace compiler {
+-namespace ruby {
+-namespace {
+-
+-string FindRubyTestDir() {
+-  return TestSourceDir() + "/google/protobuf/compiler/ruby";
+-}
+-
+-// This test is a simple golden-file test over the output of the Ruby code
+-// generator. When we make changes to the Ruby extension and alter the Ruby code
+-// generator to use those changes, we should (i) manually test the output of the
+-// code generator with the extension, and (ii) update the golden output above.
+-// Some day, we may integrate build systems between protoc and the language
+-// extensions to the point where we can do this test in a more automated way.
+-
+-TEST(RubyGeneratorTest, GeneratorTest) {
+-  string ruby_tests = FindRubyTestDir();
+-
+-  google::protobuf::compiler::CommandLineInterface cli;
+-  cli.SetInputsAreProtoPathRelative(true);
+-
+-  ruby::Generator ruby_generator;
+-  cli.RegisterGenerator("--ruby_out", &ruby_generator, "");
+-
+-  // Copy generated_code.proto to the temporary test directory.
+-  string test_input;
+-  GOOGLE_CHECK_OK(File::GetContents(
+-      ruby_tests + "/ruby_generated_code.proto",
+-      &test_input,
+-      true));
+-  GOOGLE_CHECK_OK(File::SetContents(
+-      TestTempDir() + "/ruby_generated_code.proto",
+-      test_input,
+-      true));
+-
+-  // Invoke the proto compiler (we will be inside TestTempDir() at this point).
+-  string ruby_out = "--ruby_out=" + TestTempDir();
+-  string proto_path = "--proto_path=" + TestTempDir();
+-  const char* argv[] = {
+-    "protoc",
+-    ruby_out.c_str(),
+-    proto_path.c_str(),
+-    "ruby_generated_code.proto",
+-  };
+-
+-  EXPECT_EQ(0, cli.Run(4, argv));
+-
+-  // Load the generated output and compare to the expected result.
+-  string output;
+-  GOOGLE_CHECK_OK(File::GetContents(
+-      TestTempDir() + "/ruby_generated_code_pb.rb",
+-      &output,
+-      true));
+-  string expected_output;
+-  GOOGLE_CHECK_OK(File::GetContents(
+-      ruby_tests + "/ruby_generated_code_pb.rb",
+-      &expected_output,
+-      true));
+-  EXPECT_EQ(expected_output, output);
+-}
+-
+-}  // namespace
+-}  // namespace ruby
+-}  // namespace compiler
+-}  // namespace protobuf
+-}  // namespace google
+-- 
+2.29.2
+
