@@ -17,7 +17,17 @@ share {
     #   Libs.private: -L/install/location/libs/libprotobuf.a
     # which then allows static linking to libprotobuf when using
     # Alien::Protobuf3_1_0->libs_static/
-    patch [ '%{patch} -p1 < %{.install.patch}/protobuf.pc-add-static-library-to-Libs.private-to-allow-static-linking.patch' ];
+    patch [
+        '%{patch} -p1 < %{.install.patch}/0001-Removed-Java.patch',
+        '%{patch} -p1 < %{.install.patch}/0002-Removed-ObjectiveC.patch',
+        '%{patch} -p1 < %{.install.patch}/0003-configure-do-not-build-gmock-speeds-up-configuration.patch',
+        '%{patch} -p1 < %{.install.patch}/0004-Removed-C.patch',
+        '%{patch} -p1 < %{.install.patch}/0005-Removed-Python.patch',
+        '%{patch} -p1 < %{.install.patch}/0006-Removed-gmock.patch',
+        '%{patch} -p1 < %{.install.patch}/0007-Removed-PHP.patch',
+        '%{patch} -p1 < %{.install.patch}/0008-Removed-Ruby.patch',
+        '%{patch} -p1 < %{.install.patch}/0009-protobuf.pc-add-static-library-to-Libs.private-to-allow-static-linking.patch',
+    ];
 
     plugin 'Build::Autoconf' => ();
     build [
