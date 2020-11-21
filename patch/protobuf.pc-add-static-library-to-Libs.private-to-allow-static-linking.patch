@@ -1,0 +1,10 @@
+--- ./protobuf.pc.in	2020-11-21 14:56:06.000000000 +0100
++++ ./protobuf.pc.in	2020-11-21 14:57:02.000000000 +0100
+@@ -7,6 +7,6 @@
+ Description: Google's Data Interchange Format
+ Version: @VERSION@
+ Libs: -L${libdir} -lprotobuf @PTHREAD_CFLAGS@ @PTHREAD_LIBS@
+-Libs.private: @LIBS@
++Libs.private: @LIBS@ -L${libdir}/libprotobuf@CMAKE_STATIC_LIBRARY_SUFFIX@
+ Cflags: -I${includedir} @PTHREAD_CFLAGS@
+ Conflicts: protobuf-lite

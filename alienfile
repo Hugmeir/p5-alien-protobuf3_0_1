@@ -13,13 +13,17 @@ share {
 
     plugin Extract => 'tar.gz';
 
-      plugin 'Build::Autoconf' => ();
+    # patch protobuf.pc.in so that the generated protobuf.pc has
+    #   Libs.private: -L/install/location/libs/libprotobuf.a
+    # which then allows static linking to libprotobuf when using
+    # Alien::Protobuf3_1_0->libs_static/
+    patch [ '%{patch} -p1 < %{.install.patch}/protobuf.pc-add-static-library-to-Libs.private-to-allow-static-linking.patch' ];
 
-      build [
+    plugin 'Build::Autoconf' => ();
+    build [
         '%{configure}',
-        '%{make}',
+        [ '%{make}',  '-j6' ], # maybe more?  Otherwise compilation takes an eternity
         '%{make} install',
-      ];
-
+    ];
 };
 

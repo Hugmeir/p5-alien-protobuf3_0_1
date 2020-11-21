@@ -1,5 +1,5 @@
 package Alien::Protobuf3_1_0;
-use 5.006;
+use v5.24;
 use strict;
 use warnings;
 
