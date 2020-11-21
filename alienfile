@@ -31,9 +31,18 @@ share {
 
     plugin 'Build::Autoconf' => ();
     build [
-        '%{configure}',
-        [ '%{make}',  '-j6' ], # maybe more?  Otherwise compilation takes an eternity
-        '%{make} install',
+        # `--disable-maintainer-mode` removes dependencies on automake and aclocal
+        # `--disable-debug` removes a truckload of debug symbols
+        '%{configure} --disable-maintainer-mode --with-zlib --disable-debug',
+        [
+            '%{make}',
+                '-j6', # maybe more?  Without this compilation takes an eternity
+        ],
+        [
+            '%{make}',
+                # TODO: only do this if we have strip?
+                'install-strip', # reduces static library size from ~40mb to 4mb
+        ],
     ];
 };
 
