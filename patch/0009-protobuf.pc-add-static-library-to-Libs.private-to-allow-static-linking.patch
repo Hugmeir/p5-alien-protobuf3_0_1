@@ -30,15 +30,15 @@ index 4901490..e75ddb9 100644
  libdir=@libdir@
  includedir=@includedir@
 +libext=.@libext@
- 
+
  Name: Protocol Buffers
  Description: Google's Data Interchange Format
  Version: @VERSION@
  Libs: -L${libdir} -lprotobuf @PTHREAD_CFLAGS@ @PTHREAD_LIBS@
 -Libs.private: @LIBS@
-+Libs.private: @LIBS@ -L${libdir}/libprotobuf${libext}
++Libs.private: @LIBS@ ${libdir}/libprotobuf${libext}
  Cflags: -I${includedir} @PTHREAD_CFLAGS@
  Conflicts: protobuf-lite
--- 
+--
 2.29.2
 
